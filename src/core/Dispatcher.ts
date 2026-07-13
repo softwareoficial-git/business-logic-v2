@@ -80,8 +80,19 @@ class Dispatcher {
 
     const { handler, metadata } = command;
 
+    // Bypass RBAC and Plan validation for profile verification used in middleware
+    if (commandName === 'USER:get-profile' && context.role === 'GUEST') {
+        try {
+            const result = await handler(context, params);
+            return result;
+        } catch (error: any) {
+            return { success: false, message: error.message };
+        }
+    }
+
     // 1. Validación de Rol (RBAC)
     if (!this.validateRole(context.role, metadata.requiredRole)) {
+
       return {
         success: false,
         message: "Insufficient permissions to execute this command",

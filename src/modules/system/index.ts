@@ -15,8 +15,34 @@ class SystemModule {
       requiredRole: 'GUEST'
     }, this.login);
 
+    dispatcher.register('USER:get-profile', {
+      name: 'USER:get-profile',
+      description: 'Obtiene el perfil del usuario autenticado',
+      requiredRole: 'GUEST'
+    }, this.getProfile);
+
+    dispatcher.register('USER:list-sessions', {
+      name: 'USER:list-sessions',
+      description: 'Lista todas las sesiones activas del usuario',
+      requiredRole: 'DUEÑO'
+    }, this.listSessions);
+
+    dispatcher.register('USER:logout', {
+      name: 'USER:logout',
+      description: 'Cierra la sesión actual',
+      requiredRole: 'GUEST'
+    }, this.logout);
+
+    dispatcher.register('USER:revoke-session', {
+      name: 'USER:revoke-session',
+      description: 'Revoca una sesión específica',
+      requiredRole: 'DUEÑO'
+    }, this.revokeSession);
+
     // Comando de descubrimiento para la auditoría
     dispatcher.register('SYSTEM:list-commands', {
+
+
       name: 'SYSTEM:list-commands',
       description: 'Lista todos los comandos disponibles en el sistema',
       requiredRole: 'SISTEMA_ADMIN'
@@ -69,14 +95,42 @@ class SystemModule {
       return {
         success: true,
         message: 'Login successful',
-        data: { token: res.data.token, user: res.data.usuario }
+        data: { token: res.data.token, user: res.data.user }
       };
     } catch (e: any) {
       return { success: false, message: e.message || 'Login error' };
     }
   }
 
+  private async getProfile(context: RequestContext, params: any): Promise<ServiceResponse> {
+    try {
+      const res = await infraClient.execute('USER:get-profile', params, context.token);
+      if (!res.success) return res;
+      return {
+        success: true,
+        message: 'Profile retrieved successfully',
+        data: { profile: res.data }
+      };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Profile error' };
+    }
+  }
+
+  private async listSessions(context: RequestContext, params: any): Promise<ServiceResponse> {
+    return infraClient.execute('USER:list-sessions', params, context.token);
+  }
+
+  private async logout(context: RequestContext, params: any): Promise<ServiceResponse> {
+    return infraClient.execute('USER:logout', { token: context.token }, context.token);
+  }
+
+  private async revokeSession(context: RequestContext, params: any): Promise<ServiceResponse> {
+    return infraClient.execute('USER:revoke-session', params, context.token);
+  }
+
   private async listCommands(context: RequestContext, params: any): Promise<ServiceResponse> {
+
+
     const commands = dispatcher.getAvailableCommands();
     const catalog: Record<string, any> = {};
     commands.forEach(cmd => {
