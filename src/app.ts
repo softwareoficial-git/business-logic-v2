@@ -19,8 +19,8 @@ const contextMiddleware = async (req: Request, res: Response, next: NextFunction
   const token = req.cookies.session_token || req.headers.authorization?.toString().replace('Bearer ', '');
   const { cmd } = req.body;
   
-  // Permitir login sin token
-  if (cmd === 'USER:login') {
+  // Permitir login y track-visit sin token
+  if (cmd === 'USER:login' || cmd === 'ANALYTICS:track-visit') {
     (req as any).context = {
       tenantId: 0,
       userId: 'guest',
