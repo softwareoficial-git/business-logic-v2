@@ -16,9 +16,7 @@ class InfraClient {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl =
-      process.env.DB_URL ||
-      "https://infrastructure-engine-production.up.railway.app/";
+    this.baseUrl = "http://localhost:3001";
     this.httpClient = axios.create({
       baseURL: this.baseUrl,
       timeout: 15000,
@@ -32,13 +30,19 @@ class InfraClient {
     token: string,
   ): Promise<ServiceResponse<T>> {
     try {
-      const response = await this.httpClient.post("/execute", {
-        token: token,
-        cmd: cmd,
+      const requestBody: any = {
+        command: cmd,
         payload: payload,
-      });
+      };
+      
+      if (token) {
+        requestBody.token = token;
+      }
+
+      const response = await this.httpClient.post("/execute", requestBody);
 
       const result = response.data;
+//...
       console.log(
         `[INFRA_RESPONSE] CMD: ${cmd} | STATUS: ${result.status} | DATA:`,
         JSON.stringify(result.data, null, 2),
@@ -60,10 +64,10 @@ class InfraClient {
       } else {
         return {
           success: false,
-          message: result.error?.message || "Infra Error",
+          message: result.error?.message || "La infraestructura devolvió un error en la ejecución del comando.",
           error: {
-            code: result.error?.code || "INFRA_ERROR",
-            message: result.error?.message || "Unknown error",
+            code: result.error?.code || "INFRA_EXECUTION_ERROR",
+            message: result.error?.message || "Se produjo un error interno en el motor de infraestructura al procesar la solicitud.",
             details: result.error?.details,
           },
         };
@@ -74,9 +78,9 @@ class InfraClient {
         message:
           error.response?.data?.error?.message ||
           error.message ||
-          "Network Error",
+          "No se pudo establecer conexión con el servidor de infraestructura.",
         error: {
-          code: error.response?.data?.error?.code || "HTTP_ERROR",
+          code: error.response?.data?.error?.code || "INFRA_CONNECTION_ERROR",
           message: error.message,
         },
       };

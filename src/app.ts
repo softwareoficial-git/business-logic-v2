@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { Request, Response, NextFunction } from 'express';
 import { dispatcher } from './core/Dispatcher';
+import { infraClient } from './core/InfraClient';
 import { ErrorHandler } from './core/ErrorHandler';
 import { RequestContext } from './core/RequestContext';
 import { logger } from './core/Logger'; // Assuming Logger is moved to V2 or we use a simple console
@@ -60,7 +61,7 @@ const contextMiddleware = async (req: Request, res: Response, next: NextFunction
     const user = profileResult.data.profile;
 
     (req as any).context = {
-      tenantId: user.cliente_id || 0,
+      tenantId: user.cliente_id,
       userId: user.id ? user.id.toString() : 'unknown',
       role: user.role_name || 'USER',
       plan: 'pro',
@@ -78,6 +79,40 @@ const contextMiddleware = async (req: Request, res: Response, next: NextFunction
 };
 
 app.get('/health', (req, res) => res.json({ status: 'online', version: '2.0.0' }));
+
+app.post('/register', async (req: Request, res: Response) => {
+  const { username, password, nombreCliente } = req.body;
+
+  if (!username || !password || !nombreCliente) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'username, password and nombreCliente are required' 
+    });
+  }
+
+  try {
+    // Importante: Usamos el comando exacto que Infra Engine reconoce: 'APP:self-register'
+    // Pasamos el payload directamente. InfraClient.execute ya envuelve esto en { token, cmd, payload }
+    const result = await infraClient.execute('APP:self-register', {
+      username,
+      password,
+      nombreCliente,
+    }, '');
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Account created successfully',
+      data: result.data
+    });
+  } catch (error: any) {
+    console.error('[REGISTER_ERROR]', error);
+    res.status(500).json({ success: false, message: 'Internal registration error' });
+  }
+});
 
 app.get('/commands', (req, res) => {
   const commands = dispatcher.getAvailableCommands();
@@ -118,6 +153,11 @@ app.post('/execute', contextMiddleware, async (req: Request, res: Response) => {
       // Remove token from the JSON response so the frontend never sees it
       const { token, ...restData } = result.data;
       result.data = { ...restData, sessionEstablished: true };
+    }
+
+    // If the command was logout, clear the session cookie
+    if (cmd === 'USER:logout') {
+      res.clearCookie('session_token');
     }
     // --------------------------------
 

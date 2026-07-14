@@ -92,11 +92,14 @@ class Dispatcher {
 
     // 1. Validación de Rol (RBAC)
     if (!this.validateRole(context.role, metadata.requiredRole)) {
-
       return {
         success: false,
-        message: "Insufficient permissions to execute this command",
-        error: { code: "FORBIDDEN", message: "No tienes permisos suficientes" },
+        message: `Acceso denegado. Este comando requiere el rol ${metadata.requiredRole}, pero tu rol actual es ${context.role}.`,
+        error: { 
+          code: "ROLE_INSUFFICIENT", 
+          message: "No tienes el nivel de acceso necesario para esta operación.",
+          details: { requiredRole: metadata.requiredRole, currentRole: context.role }
+        },
       };
     }
 
@@ -109,10 +112,11 @@ class Dispatcher {
     ) {
       return {
         success: false,
-        message: `This command requires a ${requiredPlan.toUpperCase()} plan.`,
+        message: `Este comando requiere un plan ${requiredPlan.toUpperCase()}. Tu plan actual es ${userPlan.toUpperCase()}.`,
         error: {
-          code: "PLAN_REQUIRED",
-          message: "Tu plan actual no permite esta operación",
+          code: "PLAN_INSUFFICIENT",
+          message: "Tu plan actual no incluye esta funcionalidad.",
+          details: { requiredPlan, currentPlan: userPlan }
         },
       };
     }

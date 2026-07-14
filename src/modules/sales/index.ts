@@ -171,7 +171,11 @@ class SalesModule {
   }
 
   private async getHistory(context: RequestContext, params: any): Promise<ServiceResponse> {
-    return infraClient.readPath(context.tenantId, 'sales.history', context.token);
+    const res = await infraClient.readPath(context.tenantId, 'sales.history', context.token);
+    if (!res.success && res.error?.code === 'PATH_NOT_FOUND') {
+      return { success: true, message: 'No sales history found', data: [] };
+    }
+    return res;
   }
 
   private async getHistoryFixed(context: RequestContext, params: any): Promise<ServiceResponse> {

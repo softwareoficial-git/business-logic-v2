@@ -90,7 +90,8 @@ class SystemModule {
       if (!username || !password) {
         return { success: false, message: 'Username and password are required', error: { code: 'VALIDATION_ERROR', message: 'Username and password are required' } };
       }
-      const res = await infraClient.execute('USER:login', { username, password }, 'BOOTSTRAP_TOKEN');
+      // El comando USER:login es público, no debe usarse un token administrativo aquí
+      const res = await infraClient.execute('USER:login', { username, password }, '');
       if (!res.success) return res;
       return {
         success: true,
@@ -109,7 +110,7 @@ class SystemModule {
       return {
         success: true,
         message: 'Profile retrieved successfully',
-        data: { profile: res.data }
+        data: res.data
       };
     } catch (e: any) {
       return { success: false, message: e.message || 'Profile error' };

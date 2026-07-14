@@ -45,15 +45,15 @@ class StaffModule {
   }
 
   private async createEmployee(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const { name, role, type = 'human', userId, botProfileId } = params;
-    if (!name || !role) {
-      return { success: false, message: 'Faltan datos obligatorios: name y role' };
+    const { nombre, role, username, password, type = 'human', userId, botProfileId } = params;
+    if (!nombre || !role) {
+      return { success: false, message: 'Faltan datos obligatorios: nombre y role' };
     }
 
     // 1. Crear el usuario en la infraestructura (Auth/System)
     const userRes = await infraClient.execute('CLIENT:user-create', {
-      username: name.replace(/\\s+/g, '_').toLowerCase(),
-      password: 'DefaultPassword123!', 
+      username: username || nombre.replace(/\\s+/g, '_').toLowerCase(),
+      password: password || 'DefaultPassword123!', 
       role: role.toUpperCase(),
       clienteId: context.tenantId,
       type,
@@ -65,11 +65,10 @@ class StaffModule {
     const createdUser = userRes.data?.usuario || userRes.data;
 
     // 2. Registrar el empleado en la configuración del Tenant (Lógica de Negocio)
-    // Esto es crucial para que comandos como 'staff.set_goal' encuentren al empleado en el array 'employees'
     await infraClient.pushItem(context.tenantId, 'employees', {
       id: createdUser.id,
       username: createdUser.username,
-      name,
+      name: nombre,
       role,
       type,
       joinedAt: new Date().toISOString()

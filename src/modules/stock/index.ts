@@ -43,31 +43,6 @@ class StockModule {
   }
 
   private async listStock(context: RequestContext, params: any): Promise<ServiceResponse> {
-    if (context.role === 'SISTEMA_ADMIN') {
-      return infraClient.readPath(context.tenantId, 'stock', context.token);
-    }
-
-    try {
-      // Validamos que el usuario pertenezca al tenant solicitado
-      // Obtenemos la lista de usuarios del tenant y verificamos la presencia del userId actual
-      const usersRes = await infraClient.readPath<any[]>(context.tenantId, 'users', context.token);
-      
-      if (!usersRes.success || !usersRes.data) {
-        return { success: false, message: 'Error al validar pertenencia al tenant' };
-      }
-
-      const users = usersRes.data;
-      const userExists = Array.isArray(users) 
-        ? users.some(u => u.id === context.userId || u.username === context.userId)
-        : false;
-
-      if (!userExists) {
-        return { success: false, message: 'Acceso no autorizado: el usuario no pertenece a este tenant' };
-      }
-    } catch (e: any) {
-      return { success: false, message: 'Error de validación de seguridad' };
-    }
-
     return infraClient.readPath(context.tenantId, 'stock', context.token);
   }
 
