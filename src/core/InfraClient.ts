@@ -16,11 +16,14 @@ class InfraClient {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = "http://localhost:3001";
+    this.baseUrl = process.env.DB_URL || "http://localhost:3001";
     this.httpClient = axios.create({
       baseURL: this.baseUrl,
       timeout: 15000,
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.DB_TOKEN || ""}`
+      },
     });
   }
 
