@@ -150,8 +150,11 @@ app.post('/execute', contextMiddleware, async (req: Request, res: Response) => {
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
       });
       
-      // Remove token from the JSON response so the frontend never sees it
+      // Include token in user object for cross-origin compatibility, instead of removing it
       const { token, ...restData } = result.data;
+      if (restData.user) {
+        restData.user.token = token;
+      }
       result.data = { ...restData, sessionEstablished: true };
     }
 
