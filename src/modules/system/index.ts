@@ -56,8 +56,8 @@ class SystemModule {
     }, this.setupTenant);
 
     // Rastreo de Visitas (Público)
-    dispatcher.register('system.track_visit', {
-      name: 'system.track_visit',
+    dispatcher.register('ANALYTICS:track-visit', {
+      name: 'ANALYTICS:track-visit',
       description: 'Rastrea visitas al sitio web automáticamente',
       requiredRole: 'GUEST'
     }, this.trackVisit);
