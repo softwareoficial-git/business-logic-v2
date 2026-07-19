@@ -20,9 +20,9 @@ class InfraClient {
     this.httpClient = axios.create({
       baseURL: this.baseUrl,
       timeout: 15000,
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.DB_TOKEN || ""}`
+        Authorization: `Bearer ${process.env.DB_TOKEN || ""}`,
       },
     });
   }
@@ -37,7 +37,7 @@ class InfraClient {
         command: cmd,
         payload: payload,
       };
-      
+
       if (token) {
         requestBody.token = token;
       }
@@ -45,7 +45,7 @@ class InfraClient {
       const response = await this.httpClient.post("/execute", requestBody);
 
       const result = response.data;
-//...
+      //...
       console.log(
         `[INFRA_RESPONSE] CMD: ${cmd} | STATUS: ${result.status} | DATA:`,
         JSON.stringify(result.data, null, 2),
@@ -67,10 +67,14 @@ class InfraClient {
       } else {
         return {
           success: false,
-          message: result.error?.message || "La infraestructura devolvió un error en la ejecución del comando.",
+          message:
+            result.error?.message ||
+            "La infraestructura devolvió un error en la ejecución del comando.",
           error: {
             code: result.error?.code || "INFRA_EXECUTION_ERROR",
-            message: result.error?.message || "Se produjo un error interno en el motor de infraestructura al procesar la solicitud.",
+            message:
+              result.error?.message ||
+              "Se produjo un error interno en el motor de infraestructura al procesar la solicitud.",
             details: result.error?.details,
           },
         };

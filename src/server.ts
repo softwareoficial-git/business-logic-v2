@@ -11,6 +11,7 @@ import { businessModule } from './modules/business';
 import { crmModule } from './modules/crm';
 import { operationsModule } from './modules/operations';
 import { registrationModule } from './modules/registration';
+import { importModule } from './modules/import';
 
 
 async function bootstrap() {
@@ -29,6 +30,7 @@ async function bootstrap() {
     crmModule;
     operationsModule;
     registrationModule;
+    importModule;
 
     const port = parseInt(process.env.PORT || '9002', 10);
 

@@ -81,13 +81,13 @@ class Dispatcher {
     const { handler, metadata } = command;
 
     // Bypass RBAC and Plan validation for profile verification used in middleware
-    if (commandName === 'USER:get-profile' && context.role === 'GUEST') {
-        try {
-            const result = await handler(context, params);
-            return result;
-        } catch (error: any) {
-            return { success: false, message: error.message };
-        }
+    if (commandName === "USER:get-profile" && context.role === "GUEST") {
+      try {
+        const result = await handler(context, params);
+        return result;
+      } catch (error: any) {
+        return { success: false, message: error.message };
+      }
     }
 
     // 1. Validación de Rol (RBAC)
@@ -95,10 +95,14 @@ class Dispatcher {
       return {
         success: false,
         message: `Acceso denegado. Este comando requiere el rol ${metadata.requiredRole}, pero tu rol actual es ${context.role}.`,
-        error: { 
-          code: "ROLE_INSUFFICIENT", 
-          message: "No tienes el nivel de acceso necesario para esta operación.",
-          details: { requiredRole: metadata.requiredRole, currentRole: context.role }
+        error: {
+          code: "ROLE_INSUFFICIENT",
+          message:
+            "No tienes el nivel de acceso necesario para esta operación.",
+          details: {
+            requiredRole: metadata.requiredRole,
+            currentRole: context.role,
+          },
         },
       };
     }
@@ -116,7 +120,7 @@ class Dispatcher {
         error: {
           code: "PLAN_INSUFFICIENT",
           message: "Tu plan actual no incluye esta funcionalidad.",
-          details: { requiredPlan, currentPlan: userPlan }
+          details: { requiredPlan, currentPlan: userPlan },
         },
       };
     }

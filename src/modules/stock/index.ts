@@ -31,12 +31,25 @@ class StockModule {
   }
 
   private async addProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const { code, name, price, qty } = params;
-    if (!code || !name || price === undefined || qty === undefined) {
-      return { success: false, message: 'Faltan datos obligatorios: code, name, price y qty' };
+    const { code, name, price, qty, category, ...metadata } = params;
+    
+    // Validación de campos obligatorios globales
+    if (!code || !name || price === undefined || qty === undefined || !category) {
+      return { 
+        success: false, 
+        message: 'Faltan datos obligatorios globales: code, name, price, qty y category' 
+      };
     }
 
-    const item = { code, name, price, qty };
+    // Estructura universal: campos base + metadata dinámica
+    const item = { 
+      code, 
+      name, 
+      price, 
+      qty, 
+      category,
+      metadata: Object.keys(metadata).length > 0 ? metadata : {}
+    };
     
     // Usamos pushItem que implementa Read-Modify-Write internamente
     return infraClient.pushItem(context.tenantId, 'stock', item, context.token);

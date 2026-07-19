@@ -86,17 +86,7 @@ class SalesModule {
       }
     }
 
-    // 4. Registrar la Venta en el historial (Atómico via pushItem)
-    const saleRecord = {
-      id: `SALE-${Date.now()}`,
-      customerId,
-      items,
-      total: totalSale,
-      date: new Date().toISOString(),
-      userId: context.userId
-    };
-
-    return infraClient.pushItem(context.tenantId, 'sales.history', saleRecord, context.token);
+    return { success: true, message: 'Venta procesada y stock actualizado correctamente.' };
   }
 
   private async createOrder(context: RequestContext, params: any): Promise<ServiceResponse> {
