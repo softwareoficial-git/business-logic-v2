@@ -6,6 +6,7 @@ import { dispatcher } from './core/Dispatcher';
 import { infraClient } from './core/InfraClient';
 import { ErrorHandler } from './core/ErrorHandler';
 import { RequestContext } from './core/RequestContext';
+import { csrfMiddleware } from './core/CsrfMiddleware';
 import { logger } from './core/Logger'; // Assuming Logger is moved to V2 or we use a simple console
 
 // Middlewares basicos
@@ -13,6 +14,7 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
 app.use(express.json());
+app.use(csrfMiddleware);
 
 // Middleware para construir el RequestContext desde las cookies/headers
 const contextMiddleware = async (req: Request, res: Response, next: NextFunction) => {
@@ -145,8 +147,8 @@ app.post('/execute', contextMiddleware, async (req: Request, res: Response) => {
     if (cmd === 'USER:login' && result.data?.token) {
       res.cookie('session_token', result.data.token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: true,
+        sameSite: 'none',
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
       });
       
