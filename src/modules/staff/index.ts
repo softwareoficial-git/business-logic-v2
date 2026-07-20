@@ -49,6 +49,27 @@ class StaffModule {
       description: 'Elimina un empleado de la empresa',
       requiredRole: 'DUEÑO'
     }, this.deleteEmployee);
+
+    // Monitoreo de Actividad
+    dispatcher.register('staff.get_employee_activity', {
+      name: 'staff.get_employee_activity',
+      description: 'Consulta la línea de tiempo de actividades de un empleado',
+      requiredRole: 'DUEÑO'
+    }, this.getEmployeeActivity);
+  }
+
+  // ... (métodos existentes createEmployee, defineTerm, setGoal, listEmployees, updatePermissions, deleteEmployee)
+
+  private async getEmployeeActivity(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const { userId } = params;
+    if (!userId) {
+      return { success: false, message: 'userId es requerido' };
+    }
+
+    // Consulta la infraestructura directamente reutilizando SYSTEM:user-audit
+    return infraClient.execute('SYSTEM:user-audit', {
+      userId: userId
+    }, context.token);
   }
 
   private async createEmployee(context: RequestContext, params: any): Promise<ServiceResponse> {
