@@ -33,7 +33,7 @@ class StockModule {
     dispatcher.register('stock.delete', {
       name: 'stock.delete',
       description: 'Elimina un producto del inventario',
-      requiredRole: ['EMPLEADO', 'DUEÑO']
+      requiredRole: 'DUEÑO'
     }, this.deleteProduct);
   }
 
