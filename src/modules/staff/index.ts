@@ -42,6 +42,13 @@ class StaffModule {
       description: 'Actualiza los permisos granulares de un empleado',
       requiredRole: 'DUEÑO'
     }, this.updatePermissions);
+
+    // Eliminar Empleado
+    dispatcher.register('staff.delete', {
+      name: 'staff.delete',
+      description: 'Elimina un empleado de la empresa',
+      requiredRole: 'DUEÑO'
+    }, this.deleteEmployee);
   }
 
   private async createEmployee(context: RequestContext, params: any): Promise<ServiceResponse> {
@@ -140,6 +147,32 @@ class StaffModule {
       clienteId: context.tenantId,
       permissions
     }, context.token);
+  }
+
+  private async deleteEmployee(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const { userId } = params;
+    if (!userId) {
+      return { success: false, message: 'userId es requerido' };
+    }
+
+    // 1. Eliminar usuario en Infraestructura (Auth/System)
+    const userRes = await infraClient.execute('CLIENT:user-delete', {
+      userId: userId,
+      clienteId: context.tenantId
+    }, context.token);
+
+    if (!userRes.success) return userRes;
+
+    // 2. Leer empleados actuales
+    const res = await infraClient.readPath<any[]>(context.tenantId, 'employees', context.token);
+    if (!res.success) return res;
+
+    const employees = res.data || [];
+    // 3. Filtrar el empleado
+    const updatedEmployees = employees.filter(e => e.id !== userId);
+
+    // 4. Guardar array completo
+    return infraClient.updatePath(context.tenantId, 'employees', updatedEmployees, context.token);
   }
 }
 
