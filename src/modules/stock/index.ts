@@ -28,6 +28,13 @@ class StockModule {
       description: 'Actualiza la cantidad de un producto específico',
       requiredRole: 'EMPLEADO'
     }, this.updateQuantity);
+
+    // Eliminar Producto
+    dispatcher.register('stock.delete', {
+      name: 'stock.delete',
+      description: 'Elimina un producto del inventario',
+      requiredRole: ['EMPLEADO', 'DUEÑO']
+    }, this.deleteProduct);
   }
 
   private async addProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
@@ -86,6 +93,30 @@ class StockModule {
 
     // 3. Guardar array completo
     return infraClient.updatePath(context.tenantId, 'stock', stock, context.token);
+  }
+
+  private async deleteProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const { code } = params;
+    if (!code) {
+      return { success: false, message: 'code es requerido' };
+    }
+
+    // 1. Leer stock actual
+    const res = await infraClient.readPath<any[]>(context.tenantId, 'stock', context.token);
+    if (!res.success) return res;
+
+    const stock = res.data || [];
+    const initialLength = stock.length;
+    
+    // 2. Filtrar el producto
+    const updatedStock = stock.filter(p => p.code !== code);
+
+    if (updatedStock.length === initialLength) {
+      return { success: false, message: 'Producto no encontrado' };
+    }
+
+    // 3. Guardar array completo filtrado
+    return infraClient.updatePath(context.tenantId, 'stock', updatedStock, context.token);
   }
 }
 
