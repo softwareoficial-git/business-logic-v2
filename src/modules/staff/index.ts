@@ -82,6 +82,7 @@ class StaffModule {
         fecha: (typeof log.created_at === 'string' ? log.created_at : new Date().toISOString()),
         comando: log.command,
         estatus: log.status,
+        resumen: log.resumen,
         detalle: log.payload
       }));
 
