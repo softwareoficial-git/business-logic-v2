@@ -61,7 +61,7 @@ class StaffModule {
   // ... (métodos existentes createEmployee, defineTerm, setGoal, listEmployees, updatePermissions, deleteEmployee)
 
   private async getEmployeeActivity(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const { userId, limit, offset } = params;
+    const { userId, limit, offset, debug } = params;
 
     // Usar el nuevo comando USER:audit-team que permite auditoría segura para DUEÑOS
     const res = await infraClient.execute('USER:audit-team', {
@@ -71,6 +71,14 @@ class StaffModule {
     }, context.token);
 
     if (!res.success) return res;
+
+    // DEBUG: Inspeccionar qué devuelve exactamente el comando
+    console.log(`[DEBUG_AUDIT] Timeline bruto recibido:`, JSON.stringify(res.data.timeline, null, 2));
+
+    // Si modo debug, devolver datos crudos
+    if (debug) {
+      return { success: true, message: 'Logs crudos obtenidos', data: res.data.timeline };
+    }
 
     // Transformar y organizar los datos para el frontend
     const timeline = res.data.timeline || [];
