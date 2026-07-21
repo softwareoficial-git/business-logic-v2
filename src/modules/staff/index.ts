@@ -88,26 +88,35 @@ class StaffModule {
     const otrosEventos: any[] = [];
 
     timeline.forEach((log: any) => {
-      // 1. Si es el evento consolidado que enviamos desde SalesModule
-      if (log.command === 'sales.checkout-consolidated') {
-        const details = log.details || {};
-        const saleId = details.detalle?.client_request_id || 'ID_DESCONOCIDO';
+      // Intentamos identificar una venta por el sale_id presente en el payload
+      const saleId = log.payload?.item?.sale_id || log.payload?.item?.id;
+      
+      if (saleId) {
+        if (!ventasConsolidadas[saleId]) {
+          ventasConsolidadas[saleId] = {
+            fecha: (typeof log.created_at === 'string' ? log.created_at : new Date().toISOString()),
+            comando: 'Venta realizada',
+            estatus: 'SUCCESS',
+            resumen: `Venta ID: ${saleId}`,
+            detalle: { items: [], total: 0 }
+          };
+        }
         
-        ventasConsolidadas[saleId] = {
-          fecha: details.fecha,
-          comando: 'Venta realizada',
-          estatus: log.status,
-          resumen: `Venta: Total $${details.detalle?.total || 0}`,
-          detalle: details.detalle // Aquí están los items completos
-        };
+        // Si es un item de venta, lo agregamos
+        if (log.payload?.item?.product_code) {
+          ventasConsolidadas[saleId].detalle.items.push({
+            product_code: log.payload.item.product_code,
+            name: log.payload.item.name || 'Producto',
+            qty: log.payload.item.quantity || log.payload.item.qty || 1,
+            price: log.payload.item.price || 0
+          });
+          ventasConsolidadas[saleId].detalle.total += ((log.payload.item.price || 0) * (log.payload.item.quantity || log.payload.item.qty || 1));
+        }
         return;
       }
 
-      // 2. Fallback: Si no es consolidado, intentamos consolidar fragmentos (por si acaso)
-      const saleId = log.payload?.item?.sale_id || log.payload?.item?.id;
-      if (saleId && !ventasConsolidadas[saleId]) {
-         // ... lógica anterior de fallback ...
-      } else if (['staff.create'].includes(log.command)) {
+      // Si no es venta, solo agregamos si es un comando relevante
+      if (['staff.create'].includes(log.command)) {
         otrosEventos.push({
           fecha: (typeof log.created_at === 'string' ? log.created_at : new Date().toISOString()),
           comando: log.command,
