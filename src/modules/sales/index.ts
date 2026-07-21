@@ -81,7 +81,10 @@ class SalesModule {
       
       const updatedProduct = { ...product, qty: product.qty - item.qty };
       
+      console.log(`[DEBUG] Actualizando stock.${index} con:`, updatedProduct);
       const updateRes = await infraClient.updatePath(context.tenantId, `stock.${index}`, updatedProduct, context.token);
+      console.log(`[DEBUG] Resultado:`, updateRes);
+      
       if (!updateRes.success) {
         return { success: false, message: `Error actualizando stock en la posición ${index}`, error: updateRes.error };
       }
