@@ -66,27 +66,29 @@ class SalesModule {
       soldItems.push({ product_code: product.code, name: product.name, qty: item.qty, price: product.price });
       totalSale += (product.price * item.qty);
     }
+// 3. Ejecutar actualizaciones atómicas individuales (para evitar permisos de SYSTEM:batch)
+for (const item of items) {
+  const index = stock.findIndex(p => p.code === item.code);
+  const product = stock[index];
+  const newQty = product.qty - item.qty;
 
-    // 3. Ejecutar actualizaciones atómicas individuales (para evitar permisos de SYSTEM:batch)
-    for (const item of items) {
-      const index = stock.findIndex(p => p.code === item.code);
-      const product = stock[index];
-      
-      const updateRes = await infraClient.atomicPushItem(context.tenantId, `stock[${index}].qty`, product.qty - item.qty, context.token);
-      if (!updateRes.success) return updateRes;
-    }
+  // Envolver el valor en un objeto para satisfacer el requerimiento de 'item' como objeto
+  const updateRes = await infraClient.atomicPushItem(context.tenantId, `stock[${index}].qty`, { value: newQty }, context.token);
+  if (!updateRes.success) return updateRes;
+}
 
-    // 4. Crear registro de venta
-    const saleId = `ORD-${Date.now()}`;
-    const saleRecord = {
-      id: saleId,
-      total: totalSale,
-      items: soldItems,
-      customerId,
-      createdAt: clientTimestamp || new Date().toISOString()
-    };
-    
-    await infraClient.atomicPushItem(context.tenantId, 'sales_orders', saleRecord, context.token);
+// 4. Crear registro de venta
+const saleId = `ORD-${Date.now()}`;
+const saleRecord = {
+  id: saleId,
+  total: totalSale,
+  items: soldItems,
+  customerId,
+  createdAt: clientTimestamp || new Date().toISOString()
+};
+
+// Aquí el saleRecord ya es un objeto, lo cual está bien
+await infraClient.atomicPushItem(context.tenantId, 'sales_orders', { item: saleRecord }, context.token);
 
     // 5. Emitir evento único de auditoría (Consolidado)
     await infraClient.execute('SYSTEM:log-event', {
