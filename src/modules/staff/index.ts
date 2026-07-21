@@ -61,15 +61,23 @@ class StaffModule {
   // ... (métodos existentes createEmployee, defineTerm, setGoal, listEmployees, updatePermissions, deleteEmployee)
 
   private async getEmployeeActivity(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const { userId } = params;
-    if (!userId) {
-      return { success: false, message: 'userId es requerido' };
-    }
+    const { userId, limit, offset } = params;
 
-    // Consulta la infraestructura directamente reutilizando SYSTEM:user-audit
-    return infraClient.execute('SYSTEM:user-audit', {
-      userId: userId
+    // Usar el nuevo comando USER:audit-team que permite auditoría segura para DUEÑOS
+    const res = await infraClient.execute('USER:audit-team', {
+      userId,
+      limit: limit || 50,
+      offset: offset || 0
     }, context.token);
+
+    if (!res.success) return res;
+
+    // Mapear la respuesta del nuevo comando al formato esperado por el frontend
+    // El nuevo comando devuelve { status, data: { timeline: [...] } }
+    return {
+      success: true,
+      data: res.data.timeline
+    };
   }
 
   private async createEmployee(context: RequestContext, params: any): Promise<ServiceResponse> {
