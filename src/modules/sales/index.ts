@@ -51,21 +51,31 @@ class SalesModule {
     // 2. Validar Stock y preparar venta
     const soldItems = [];
     let totalSale = 0;
-    const stockUpdates = [...stock]; // Clonamos para trabajar
 
     for (const item of items) {
-      const prod = stockUpdates.find(p => p.code === item.code);
-      if (!prod || prod.qty < item.qty) {
-        return { success: false, message: `Stock insuficiente o producto ${item.code} no encontrado` };
+      const index = stock.findIndex(p => p.code === item.code);
+      if (index === -1) {
+        return { success: false, message: `Producto ${item.code} no encontrado` };
       }
-      prod.qty -= item.qty;
-      soldItems.push({ product_code: prod.code, name: prod.name, qty: item.qty, price: prod.price });
-      totalSale += (prod.price * item.qty);
+      
+      const product = stock[index];
+      if (product.qty < item.qty) {
+        return { success: false, message: `Stock insuficiente para ${product.name}` };
+      }
+      
+      soldItems.push({ product_code: product.code, name: product.name, qty: item.qty, price: product.price });
+      totalSale += (product.price * item.qty);
     }
 
-    // 3. Persistir cambios de stock
-    const updateRes = await infraClient.updatePath(context.tenantId, 'stock', stockUpdates, context.token);
-    if (!updateRes.success) return updateRes;
+    // 3. Persistir cambios de stock (quirúrgico)
+    for (const item of items) {
+      const index = stock.findIndex(p => p.code === item.code);
+      const product = stock[index];
+      const updatedProduct = { ...product, qty: product.qty - item.qty };
+      
+      const updateRes = await infraClient.updatePath(context.tenantId, `stock.${index}`, updatedProduct, context.token);
+      if (!updateRes.success) return updateRes;
+    }
 
     // 4. Crear registro de venta consolidado
     const saleId = `ORD-${Date.now()}`;
