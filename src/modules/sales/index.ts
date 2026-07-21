@@ -69,31 +69,27 @@ class SalesModule {
       totalSale += (product.price * item.qty);
     }
 
-    // 3. Ejecutar actualizaciones atómicas individuales
+    // 3. Ejecutar actualizaciones (usando updatePath estándar)
     for (const item of items) {
       const index = stock.findIndex(p => p.code === item.code);
       const product = stock[index];
       const newQty = product.qty - item.qty;
-
-      const updateRes = await infraClient.atomicUpdatePath(context.tenantId, `stock[${index}].qty`, newQty, context.token);
-      if (!updateRes.success) {
-        console.log(`[DEBUG] Error en atomicUpdatePath:`, updateRes);
-        return updateRes;
-      }
+      
+      const updateRes = await infraClient.updatePath(context.tenantId, `stock[${index}].qty`, newQty, context.token);
+      if (!updateRes.success) return updateRes;
     }
 
-// 4. Crear registro de venta
-const saleId = `ORD-${Date.now()}`;
-const saleRecord = {
-  id: saleId,
-  total: totalSale,
-  items: soldItems,
-  customerId,
-  createdAt: clientTimestamp || new Date().toISOString()
-};
-
-// Usamos atomicPushItem para añadir la orden a la lista 'sales_orders'
-await infraClient.atomicPushItem(context.tenantId, 'sales_orders', saleRecord, context.token);
+    // 4. Crear registro de venta
+    const saleId = `ORD-${Date.now()}`;
+    const saleRecord = {
+      id: saleId,
+      total: totalSale,
+      items: soldItems,
+      customerId,
+      createdAt: clientTimestamp || new Date().toISOString()
+    };
+    
+    await infraClient.pushItem(context.tenantId, 'sales_orders', saleRecord, context.token);
 
     // 5. Emitir evento único de auditoría (Consolidado)
     await infraClient.execute('SYSTEM:log-event', {
