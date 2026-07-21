@@ -72,8 +72,8 @@ for (const item of items) {
   const product = stock[index];
   const newQty = product.qty - item.qty;
 
-  // Envolver el valor en un objeto para satisfacer el requerimiento de 'item' como objeto
-  const updateRes = await infraClient.atomicPushItem(context.tenantId, `stock[${index}].qty`, { value: newQty }, context.token);
+  // Usamos atomicUpdatePath para actualizar el valor escalar de 'qty'
+  const updateRes = await infraClient.atomicUpdatePath(context.tenantId, `stock[${index}].qty`, newQty, context.token);
   if (!updateRes.success) return updateRes;
 }
 
@@ -87,8 +87,8 @@ const saleRecord = {
   createdAt: clientTimestamp || new Date().toISOString()
 };
 
-// Aquí el saleRecord ya es un objeto, lo cual está bien
-await infraClient.atomicPushItem(context.tenantId, 'sales_orders', { item: saleRecord }, context.token);
+// Usamos atomicPushItem para añadir la orden a la lista 'sales_orders'
+await infraClient.atomicPushItem(context.tenantId, 'sales_orders', saleRecord, context.token);
 
     // 5. Emitir evento único de auditoría (Consolidado)
     await infraClient.execute('SYSTEM:log-event', {

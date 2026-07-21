@@ -129,6 +129,15 @@ class InfraClient {
     return this.execute("USER:atomic-push-item", { clienteId, path, item }, token);
   }
 
+  public async atomicUpdatePath(
+    clienteId: string | number,
+    path: string,
+    value: any,
+    token: string,
+  ): Promise<ServiceResponse> {
+    return this.execute("USER:atomic-update-path", { clienteId, path, value }, token);
+  }
+
   public async batch(
     commands: { cmd: string; payload: any }[],
     token: string,
