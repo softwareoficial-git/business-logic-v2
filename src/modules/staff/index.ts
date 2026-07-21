@@ -76,6 +76,7 @@ class StaffModule {
     // El nuevo comando devuelve { status, data: { timeline: [...] } }
     return {
       success: true,
+      message: 'Auditoría obtenida correctamente',
       data: res.data.timeline
     };
   }
