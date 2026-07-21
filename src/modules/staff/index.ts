@@ -61,26 +61,34 @@ class StaffModule {
   // ... (métodos existentes createEmployee, defineTerm, setGoal, listEmployees, updatePermissions, deleteEmployee)
 
   private async getEmployeeActivity(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const { userId, limit, offset, debug } = params;
+    const { userId } = params;
 
-    // Si no hay userId y es DUEÑO, obtener todos los logs del tenant
-    const auditParams = userId 
-      ? { userId, limit: limit || 100, offset: offset || 0 }
-      : { tenantId: context.tenantId, limit: limit || 100, offset: offset || 0 };
+    // 1. Si se solicita un usuario específico, consultar solo a él
+    if (userId) {
+      const res = await infraClient.execute('USER:audit-team', { userId, limit: 100 }, context.token);
+      return res.success ? { success: true, message: 'Auditoría obtenida', data: res.data.timeline || [] } : res;
+    }
 
-    const command = userId ? 'USER:audit-team' : 'SYSTEM:tenant-audit';
+    // 2. Si es global (sin userId), listar todos los empleados primero
+    const employeesRes = await this.listEmployees(context, {});
+    if (!employeesRes.success) return { success: false, message: 'No se pudieron listar los empleados para la auditoría.' };
 
-    const res = await infraClient.execute(command, auditParams, context.token);
+    const employees = employeesRes.data?.usuario || employeesRes.data || [];
+    const allTimeline: any[] = [];
 
-    if (!res.success) return res;
+    // 3. Consultar la actividad de cada empleado individualmente
+    for (const emp of employees) {
+      const res = await infraClient.execute('USER:audit-team', { userId: emp.id, limit: 50 }, context.token);
+      if (res.success && res.data.timeline) {
+        allTimeline.push(...res.data.timeline);
+      }
+    }
 
-    // Transformar y organizar los datos (mismo formato de consolidación)
-    const timeline = res.data.timeline || res.data || [];
-    
+    // 4. Transformar y organizar los datos (mismo formato consolidado)
     const ventasConsolidadas: any = {};
     const otrosEventos: any[] = [];
 
-    timeline.forEach((log: any) => {
+    allTimeline.forEach((log: any) => {
       if (log.command === 'sales.checkout-consolidated') {
         const details = log.details || {};
         const saleId = details.detalle?.client_request_id || `ID_${Date.now()}`;
