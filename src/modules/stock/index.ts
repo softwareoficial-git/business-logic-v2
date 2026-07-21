@@ -22,6 +22,13 @@ class StockModule {
       requiredRole: 'EMPLEADO'
     }, this.listStock);
 
+    // Actualizar Producto
+    dispatcher.register('stock.update', {
+      name: 'stock.update',
+      description: 'Actualiza un producto existente en el inventario',
+      requiredRole: 'EMPLEADO'
+    }, this.updateProduct);
+
     // Actualizar Cantidad
     dispatcher.register('stock.update_qty', {
       name: 'stock.update_qty',
@@ -60,6 +67,31 @@ class StockModule {
     
     // Usamos pushItem que implementa Read-Modify-Write internamente
     return infraClient.pushItem(context.tenantId, 'stock', item, context.token);
+  }
+
+  private async updateProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const { code, ...updates } = params;
+    
+    if (!code) {
+      return { success: false, message: 'El campo "code" es obligatorio para actualizar' };
+    }
+
+    // 1. Leer stock actual
+    const res = await infraClient.readPath<any[]>(context.tenantId, 'stock', context.token);
+    if (!res.success) return res;
+
+    const stock = res.data || [];
+    const productIndex = stock.findIndex(p => p.code === code);
+
+    if (productIndex === -1) {
+      return { success: false, message: `Producto con code ${code} no encontrado` };
+    }
+
+    // 2. Aplicar actualizaciones manteniendo los campos existentes
+    stock[productIndex] = { ...stock[productIndex], ...updates };
+
+    // 3. Guardar array completo
+    return infraClient.updatePath(context.tenantId, 'stock', stock, context.token);
   }
 
   private async listStock(context: RequestContext, params: any): Promise<ServiceResponse> {
