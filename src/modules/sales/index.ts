@@ -101,7 +101,11 @@ class SalesModule {
       details: {
         fecha: saleRecord.createdAt,
         resumen: `Venta: Total $${totalSale}`,
-        detalle: { total: totalSale, items: soldItems, client_request_id }
+        detalle: { 
+          total: totalSale, 
+          items: soldItems, // <--- Aquí pasamos los ítems completos
+          client_request_id 
+        }
       }
     }, context.token);
 
