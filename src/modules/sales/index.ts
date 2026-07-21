@@ -90,7 +90,7 @@ class SalesModule {
   }
 
   private async createOrder(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const { items, total, account_alias, client_request_id } = params;
+    const { items, total, account_alias, client_request_id, clientTimestamp } = params;
 
     // 1. Idempotency Check
     if (client_request_id) {
@@ -107,7 +107,7 @@ class SalesModule {
       total,
       payment_status: 'pending',
       client_request_id,
-      createdAt: new Date().toISOString()
+      createdAt: clientTimestamp || new Date().toISOString()
     };
 
     const saleRes = await infraClient.pushItem(context.tenantId, 'sales_orders', saleRecord, context.token);
