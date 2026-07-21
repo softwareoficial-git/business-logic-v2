@@ -66,18 +66,29 @@ class StaffModule {
     // Usar el nuevo comando USER:audit-team que permite auditoría segura para DUEÑOS
     const res = await infraClient.execute('USER:audit-team', {
       userId,
-      limit: limit || 50,
+      limit: limit || 100,
       offset: offset || 0
     }, context.token);
 
     if (!res.success) return res;
 
-    // Mapear la respuesta del nuevo comando al formato esperado por el frontend
-    // El nuevo comando devuelve { status, data: { timeline: [...] } }
+    // Transformar y organizar los datos para el frontend
+    const timeline = res.data.timeline || [];
+    
+    // Filtros de ruido: solo queremos acciones de negocio reales
+    const eventosOrganizados = timeline
+      .filter((log: any) => !['USER:read-path', 'USER:get-profile'].includes(log.command))
+      .map((log: any) => ({
+        fecha: log.created_at,
+        comando: log.command,
+        estatus: log.status,
+        detalle: log.payload
+      }));
+
     return {
       success: true,
-      message: 'Auditoría obtenida correctamente',
-      data: res.data.timeline
+      message: 'Auditoría organizada correctamente',
+      data: eventosOrganizados
     };
   }
 
