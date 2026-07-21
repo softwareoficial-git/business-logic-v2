@@ -38,7 +38,7 @@ class SalesModule {
   }
 
   private async checkout(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const { items, customerId } = params;
+    const { items, customerId, clientTimestamp, client_request_id } = params;
     if (!items || !Array.isArray(items) || items.length === 0) {
       return { success: false, message: 'La lista de items es requerida' };
     }
@@ -49,9 +49,9 @@ class SalesModule {
     const stock = stockRes.data || [];
 
     let totalSale = 0;
-    const updates: { path: string, value: any }[] = [];
+    const soldItems: Array<{ product_code: string; name: string; qty: number; price: number }> = [];
 
-    // 2. Validar y preparar actualizaciones quirúrgicas
+    // 2. Validar y preparar actualizaciones de stock y recopilar datos de venta
     for (const item of items) {
       const index = stock.findIndex(p => p.code === item.code);
       if (index === -1) {
@@ -63,10 +63,12 @@ class SalesModule {
         return { success: false, message: `Stock insuficiente para ${product.name}` };
       }
 
-      // Preparamos la instrucción fija para Infra: solo actualizamos la cantidad
-      updates.push({
-        path: `stock[${index}].qty`,
-        value: product.qty - item.qty
+      // Recopilar detalles del item vendido para el log consolidado
+      soldItems.push({
+        product_code: product.code,
+        name: product.name,
+        qty: item.qty,
+        price: product.price
       });
       
       totalSale += product.price * item.qty;
@@ -77,7 +79,6 @@ class SalesModule {
       const index = stock.findIndex(p => p.code === item.code);
       const product = stock[index];
       
-      // Actualizamos el objeto completo en esa posición para evitar errores de formato de ruta
       const updatedProduct = { ...product, qty: product.qty - item.qty };
       
       const updateRes = await infraClient.updatePath(context.tenantId, `stock.${index}`, updatedProduct, context.token);
@@ -85,6 +86,30 @@ class SalesModule {
         return { success: false, message: `Error actualizando stock en la posición ${index}`, error: updateRes.error };
       }
     }
+
+    // --- REGISTRO DE AUDITORÍA CONSOLIDADO ---
+    const consolidatedAuditPayload = {
+      fecha: clientTimestamp || new Date().toISOString(),
+      comando: 'sales.checkout',
+      estatus: 'SUCCESS',
+      detalle: {
+        total: totalSale,
+        items: soldItems,
+        client_request_id: client_request_id,
+        customerId: customerId,
+      }
+    };
+
+    // Empujar directamente a SYSTEM:log-event para asegurar el registro consolidado
+    await infraClient.execute('SYSTEM:log-event', {
+      status: 'SUCCESS',
+      source: 'BUSINESS_V2',
+      command: 'sales.checkout-consolidated', // Comando distintivo para este log consolidado
+      tenantId: context.tenantId,
+      userId: context.userId,
+      details: consolidatedAuditPayload
+    }, context.token);
+    // --- FIN REGISTRO DE AUDITORÍA CONSOLIDADO ---
 
     return { success: true, message: 'Venta procesada y stock actualizado correctamente.' };
   }
