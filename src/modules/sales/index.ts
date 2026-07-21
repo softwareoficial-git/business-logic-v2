@@ -43,78 +43,59 @@ class SalesModule {
       return { success: false, message: 'La lista de items es requerida' };
     }
 
-    // 1. Leer Stock Actual para validación
+    // 1. Leer Stock
     const stockRes = await infraClient.readPath<any[]>(context.tenantId, 'stock', context.token);
     if (!stockRes.success) return stockRes;
     const stock = stockRes.data || [];
 
+    // 2. Validar Stock y preparar venta
+    const soldItems = [];
     let totalSale = 0;
-    const soldItems: Array<{ product_code: string; name: string; qty: number; price: number }> = [];
+    const stockUpdates = [...stock]; // Clonamos para trabajar
 
-    // 2. Validar y preparar actualizaciones de stock y recopilar datos de venta
     for (const item of items) {
-      const index = stock.findIndex(p => p.code === item.code);
-      if (index === -1) {
-        return { success: false, message: `Producto ${item.code} no encontrado` };
+      const prod = stockUpdates.find(p => p.code === item.code);
+      if (!prod || prod.qty < item.qty) {
+        return { success: false, message: `Stock insuficiente o producto ${item.code} no encontrado` };
       }
-      
-      const product = stock[index];
-      if (product.qty < item.qty) {
-        return { success: false, message: `Stock insuficiente para ${product.name}` };
-      }
-
-      // Recopilar detalles del item vendido para el log consolidado
-      soldItems.push({
-        product_code: product.code,
-        name: product.name,
-        qty: item.qty,
-        price: product.price
-      });
-      
-      totalSale += product.price * item.qty;
+      prod.qty -= item.qty;
+      soldItems.push({ product_code: prod.code, name: prod.name, qty: item.qty, price: prod.price });
+      totalSale += (prod.price * item.qty);
     }
 
-    // 3. Ejecutar actualizaciones quirúrgicas (Blindaje de Concurrencia)
-    for (const item of items) {
-      const index = stock.findIndex(p => p.code === item.code);
-      const product = stock[index];
-      
-      const updatedProduct = { ...product, qty: product.qty - item.qty };
-      
-      console.log(`[DEBUG] Actualizando stock.${index} con:`, updatedProduct);
-      const updateRes = await infraClient.updatePath(context.tenantId, `stock.${index}`, updatedProduct, context.token);
-      console.log(`[DEBUG] Resultado:`, updateRes);
-      
-      if (!updateRes.success) {
-        return { success: false, message: `Error actualizando stock en la posición ${index}`, error: updateRes.error };
-      }
-    }
+    // 3. Persistir cambios de stock
+    const updateRes = await infraClient.updatePath(context.tenantId, 'stock', stockUpdates, context.token);
+    if (!updateRes.success) return updateRes;
 
-    // --- REGISTRO DE AUDITORÍA CONSOLIDADO ---
-    const consolidatedAuditPayload = {
-      fecha: clientTimestamp || new Date().toISOString(),
-      comando: 'sales.checkout',
-      estatus: 'SUCCESS',
-      detalle: {
-        total: totalSale,
-        items: soldItems,
-        client_request_id: client_request_id,
-        customerId: customerId,
-      }
+    // 4. Crear registro de venta consolidado
+    const saleId = `ORD-${Date.now()}`;
+    const saleRecord = {
+      id: saleId,
+      total: totalSale,
+      items: soldItems,
+      customerId,
+      createdAt: clientTimestamp || new Date().toISOString()
     };
+    await infraClient.pushItem(context.tenantId, 'sales_orders', saleRecord, context.token);
 
-    // Empujar directamente a SYSTEM:log-event para asegurar el registro consolidado
+    // 5. Emitir evento único de auditoría (Consolidado)
     await infraClient.execute('SYSTEM:log-event', {
       status: 'SUCCESS',
-      source: 'BUSINESS_V2',
-      command: 'sales.checkout-consolidated', // Comando distintivo para este log consolidado
+      command: 'sales.checkout-consolidated',
       tenantId: context.tenantId,
       userId: context.userId,
-      details: consolidatedAuditPayload
+      details: {
+        fecha: saleRecord.createdAt,
+        resumen: `Venta: Total $${totalSale}`,
+        detalle: { total: totalSale, items: soldItems, client_request_id }
+      }
     }, context.token);
-    // --- FIN REGISTRO DE AUDITORÍA CONSOLIDADO ---
 
-    return { success: true, message: 'Venta procesada y stock actualizado correctamente.' };
+    return { 
+      success: true, 
+      message: 'Venta procesada.', 
+      data: { sale_id: saleId, total: totalSale } 
+    };
   }
 
   private async createOrder(context: RequestContext, params: any): Promise<ServiceResponse> {
