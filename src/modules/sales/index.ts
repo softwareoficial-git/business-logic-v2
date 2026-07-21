@@ -48,9 +48,10 @@ class SalesModule {
     if (!stockRes.success) return stockRes;
     const stock = stockRes.data || [];
 
-    // 2. Validar Stock y preparar venta
+    // 2. Validar Stock y preparar comandos para batch
     const soldItems = [];
     let totalSale = 0;
+    const batchCommands: any[] = [];
 
     for (const item of items) {
       const index = stock.findIndex(p => p.code === item.code);
@@ -65,19 +66,19 @@ class SalesModule {
       
       soldItems.push({ product_code: product.code, name: product.name, qty: item.qty, price: product.price });
       totalSale += (product.price * item.qty);
+
+      // Usamos atomic-update-path en el batch
+      batchCommands.push({
+        cmd: 'USER:atomic-update-path',
+        payload: {
+          clienteId: context.tenantId,
+          path: `stock[${index}].qty`,
+          value: product.qty - item.qty
+        }
+      });
     }
 
-    // 3. Persistir cambios de stock (quirúrgico)
-    for (const item of items) {
-      const index = stock.findIndex(p => p.code === item.code);
-      const product = stock[index];
-      const updatedProduct = { ...product, qty: product.qty - item.qty };
-      
-      const updateRes = await infraClient.updatePath(context.tenantId, `stock.${index}`, updatedProduct, context.token);
-      if (!updateRes.success) return updateRes;
-    }
-
-    // 4. Crear registro de venta consolidado
+    // 3. Crear registro de venta (preparar para batch)
     const saleId = `ORD-${Date.now()}`;
     const saleRecord = {
       id: saleId,
@@ -86,7 +87,15 @@ class SalesModule {
       customerId,
       createdAt: clientTimestamp || new Date().toISOString()
     };
-    await infraClient.pushItem(context.tenantId, 'sales_orders', saleRecord, context.token);
+    
+    batchCommands.push({
+      cmd: 'USER:atomic-push-item',
+      payload: { clienteId: context.tenantId, path: 'sales_orders', item: saleRecord }
+    });
+
+    // 4. Ejecutar Batch
+    const batchRes = await infraClient.batch(batchCommands, context.token);
+    if (!batchRes.success) return batchRes;
 
     // 5. Emitir evento único de auditoría (Consolidado)
     await infraClient.execute('SYSTEM:log-event', {

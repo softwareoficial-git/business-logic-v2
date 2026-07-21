@@ -117,11 +117,23 @@ class InfraClient {
     item: any,
     token: string,
   ): Promise<ServiceResponse> {
-    // OPTIMIZACIÓN DE BLINDAJE: Eliminamos el ciclo Read-Modify-Write.
-    // Delegamos la operación de 'push' directamente a Infra Engine usando su comando nativo.
-    // Esto evita que el servidor V2 tenga que leer arrays gigantes, modificarlos y re-escribirlos,
-    // eliminando colisiones en ventas simultáneas y optimizando la carga masiva.
     return this.execute("USER:push-item", { clienteId, path, item }, token);
+  }
+
+  public async atomicPushItem(
+    clienteId: string | number,
+    path: string,
+    item: any,
+    token: string,
+  ): Promise<ServiceResponse> {
+    return this.execute("USER:atomic-push-item", { clienteId, path, item }, token);
+  }
+
+  public async batch(
+    commands: { cmd: string; payload: any }[],
+    token: string,
+  ): Promise<ServiceResponse> {
+    return this.execute("SYSTEM:batch", { commands }, token);
   }
 
   public async queryJson<T = any>(
