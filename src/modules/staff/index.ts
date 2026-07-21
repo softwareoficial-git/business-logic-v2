@@ -79,7 +79,7 @@ class StaffModule {
     const eventosOrganizados = timeline
       .filter((log: any) => !['USER:read-path', 'USER:get-profile'].includes(log.command))
       .map((log: any) => ({
-        fecha: log.created_at,
+        fecha: (typeof log.created_at === 'string' ? log.created_at : new Date().toISOString()),
         comando: log.command,
         estatus: log.status,
         detalle: log.payload
