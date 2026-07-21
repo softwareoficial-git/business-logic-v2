@@ -80,7 +80,7 @@ class SystemModule {
     dispatcher.register('system.audit.logs', {
       name: 'system.audit.logs',
       description: 'Obtiene el historial de auditoría de la aplicación',
-      requiredRole: 'SISTEMA_ADMIN'
+      requiredRole: 'DUEÑO'
     }, this.getAuditLogs);
   }
 

@@ -63,54 +63,45 @@ class StaffModule {
   private async getEmployeeActivity(context: RequestContext, params: any): Promise<ServiceResponse> {
     const { userId, limit, offset, debug } = params;
 
-    // Usar el nuevo comando USER:audit-team que permite auditoría segura para DUEÑOS
-    const res = await infraClient.execute('USER:audit-team', {
-      userId,
-      limit: limit || 100,
-      offset: offset || 0
-    }, context.token);
+    // Si no hay userId y es DUEÑO, obtener todos los logs del tenant
+    const auditParams = userId 
+      ? { userId, limit: limit || 100, offset: offset || 0 }
+      : { tenantId: context.tenantId, limit: limit || 100, offset: offset || 0 };
+
+    const command = userId ? 'USER:audit-team' : 'SYSTEM:tenant-audit';
+
+    const res = await infraClient.execute(command, auditParams, context.token);
 
     if (!res.success) return res;
 
-    // DEBUG: Inspeccionar qué devuelve exactamente el comando
-    console.log(`[DEBUG_AUDIT] Timeline bruto recibido:`, JSON.stringify(res.data.timeline, null, 2));
-
-    // Si modo debug, devolver datos crudos
-    if (debug) {
-      return { success: true, message: 'Logs crudos obtenidos', data: res.data.timeline };
-    }
-
-    // Transformar y organizar los datos para el frontend
-    const timeline = res.data.timeline || [];
+    // Transformar y organizar los datos (mismo formato de consolidación)
+    const timeline = res.data.timeline || res.data || [];
     
-    // Agrupamos por ID de venta para consolidar los fragmentos
     const ventasConsolidadas: any = {};
     const otrosEventos: any[] = [];
 
     timeline.forEach((log: any) => {
-      // 1. Si es el evento consolidado que enviamos desde SalesModule (Prioridad absoluta)
       if (log.command === 'sales.checkout-consolidated') {
         const details = log.details || {};
-        const saleId = details.detalle?.client_request_id || 'ID_DESCONOCIDO';
+        const saleId = details.detalle?.client_request_id || `ID_${Date.now()}`;
         
         ventasConsolidadas[saleId] = {
           fecha: details.fecha,
           comando: 'Venta realizada',
           estatus: log.status,
           resumen: details.resumen || 'Venta realizada',
-          detalle: details.detalle // Aquí están los items y total completos
+          detalle: details.detalle
         };
         return;
       }
 
-      // 2. Si no es venta consolidada, agregamos solo si es otro comando relevante
-      if (['staff.create'].includes(log.command)) {
+      if (['staff.create', 'stock.add', 'stock.update', 'stock.delete'].includes(log.command)) {
         otrosEventos.push({
           fecha: (typeof log.created_at === 'string' ? log.created_at : new Date().toISOString()),
           comando: log.command,
           estatus: log.status,
           resumen: log.resumen || 'Acción de negocio',
-          detalle: log.payload
+          detalle: log.payload || log.params
         });
       }
     });
