@@ -75,35 +75,44 @@ class StaffModule {
     // Transformar y organizar los datos para el frontend
     const timeline = res.data.timeline || [];
     
-    // Transformar y organizar los datos para el frontend
-    const eventosOrganizados = timeline
-      .filter((log: any) => !['USER:read-path', 'USER:get-profile'].includes(log.command))
-      .map((log: any) => {
-        // Si es una venta consolidada, usamos los detalles del log
-        if (log.command === 'sales.checkout-consolidated') {
-          return {
-            fecha: log.details?.fecha || log.created_at,
+    // Agrupamos por ID de venta para consolidar los fragmentos
+    const ventasConsolidadas: any = {};
+    const otrosEventos: any[] = [];
+
+    timeline.forEach((log: any) => {
+      const saleId = log.payload?.item?.sale_id || log.payload?.item?.id;
+      
+      if (saleId) {
+        if (!ventasConsolidadas[saleId]) {
+          ventasConsolidadas[saleId] = {
+            fecha: log.created_at,
             comando: 'Venta realizada',
-            estatus: log.status,
-            resumen: `Venta: Total $${log.details?.detalle?.total || 0}`,
-            detalle: log.details?.detalle || {}
+            estatus: 'SUCCESS',
+            resumen: `Venta ID: ${saleId}`,
+            detalle: { items: [], total: 0 }
           };
         }
-
-        // Para otros logs, mantenemos el mapeo genérico
-        return {
-          fecha: (typeof log.created_at === 'string' ? log.created_at : new Date().toISOString()),
+        
+        // Si es un item, agregamos al detalle
+        if (log.payload?.item?.product_code) {
+          ventasConsolidadas[saleId].detalle.items.push(log.payload.item);
+          ventasConsolidadas[saleId].detalle.total += (log.payload.item.price * (log.payload.item.qty || 1));
+        }
+      } else if (['staff.create'].includes(log.command)) {
+        otrosEventos.push({
+          fecha: log.created_at,
           comando: log.command,
           estatus: log.status,
-          resumen: log.resumen || 'Acción registrada',
-          detalle: log.payload || log.details
-        };
-      });
+          resumen: log.resumen || 'Acción de negocio',
+          detalle: log.payload
+        });
+      }
+    });
 
     return {
       success: true,
       message: 'Auditoría organizada correctamente',
-      data: eventosOrganizados
+      data: [...Object.values(ventasConsolidadas), ...otrosEventos]
     };
   }
 
