@@ -200,7 +200,7 @@ class StaffModule {
     );
   }
 
-  private async listEmployees(context: RequestContext, params: any): Promise<ServiceResponse> {
+  private listEmployees = async (context: RequestContext, params: any): Promise<ServiceResponse> => {
     return infraClient.execute('CLIENT:user-list', {
       clienteId: context.tenantId
     }, context.token);
