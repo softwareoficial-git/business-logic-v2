@@ -75,16 +75,30 @@ class StaffModule {
     // Transformar y organizar los datos para el frontend
     const timeline = res.data.timeline || [];
     
-    // Filtros de ruido: solo queremos acciones de negocio reales
+    // Transformar y organizar los datos para el frontend
     const eventosOrganizados = timeline
       .filter((log: any) => !['USER:read-path', 'USER:get-profile'].includes(log.command))
-      .map((log: any) => ({
-        fecha: (typeof log.created_at === 'string' ? log.created_at : new Date().toISOString()),
-        comando: log.command,
-        estatus: log.status,
-        resumen: log.resumen,
-        detalle: log.payload
-      }));
+      .map((log: any) => {
+        // Si es una venta consolidada, usamos los detalles del log
+        if (log.command === 'sales.checkout-consolidated') {
+          return {
+            fecha: log.details?.fecha || log.created_at,
+            comando: 'Venta realizada',
+            estatus: log.status,
+            resumen: `Venta: Total $${log.details?.detalle?.total || 0}`,
+            detalle: log.details?.detalle || {}
+          };
+        }
+
+        // Para otros logs, mantenemos el mapeo genérico
+        return {
+          fecha: (typeof log.created_at === 'string' ? log.created_at : new Date().toISOString()),
+          comando: log.command,
+          estatus: log.status,
+          resumen: log.resumen || 'Acción registrada',
+          detalle: log.payload || log.details
+        };
+      });
 
     return {
       success: true,
