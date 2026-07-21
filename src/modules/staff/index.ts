@@ -85,7 +85,7 @@ class StaffModule {
       if (saleId) {
         if (!ventasConsolidadas[saleId]) {
           ventasConsolidadas[saleId] = {
-            fecha: log.created_at,
+            fecha: (typeof log.created_at === 'string' ? log.created_at : new Date().toISOString()),
             comando: 'Venta realizada',
             estatus: 'SUCCESS',
             resumen: `Venta ID: ${saleId}`,
@@ -93,14 +93,19 @@ class StaffModule {
           };
         }
         
-        // Si es un item, agregamos al detalle
+        // Si es un item, agregamos al detalle. Buscamos el nombre en el payload si existe.
         if (log.payload?.item?.product_code) {
-          ventasConsolidadas[saleId].detalle.items.push(log.payload.item);
-          ventasConsolidadas[saleId].detalle.total += (log.payload.item.price * (log.payload.item.qty || 1));
+          ventasConsolidadas[saleId].detalle.items.push({
+            product_code: log.payload.item.product_code,
+            name: log.payload.item.name || 'Producto',
+            qty: log.payload.item.quantity || log.payload.item.qty || 1,
+            price: log.payload.item.price
+          });
+          ventasConsolidadas[saleId].detalle.total += (log.payload.item.price * (log.payload.item.qty || log.payload.item.quantity || 1));
         }
       } else if (['staff.create'].includes(log.command)) {
         otrosEventos.push({
-          fecha: log.created_at,
+          fecha: (typeof log.created_at === 'string' ? log.created_at : new Date().toISOString()),
           comando: log.command,
           estatus: log.status,
           resumen: log.resumen || 'Acción de negocio',
