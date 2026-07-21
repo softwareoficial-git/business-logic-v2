@@ -55,27 +55,32 @@ class SalesModule {
     for (const item of items) {
       const index = stock.findIndex(p => p.code === item.code);
       if (index === -1) {
+        console.log(`[DEBUG] Producto no encontrado:`, item.code);
         return { success: false, message: `Producto ${item.code} no encontrado` };
       }
-      
+
       const product = stock[index];
       if (product.qty < item.qty) {
+        console.log(`[DEBUG] Stock insuficiente para:`, product.name, 'Necesita:', item.qty, 'Tiene:', product.qty);
         return { success: false, message: `Stock insuficiente para ${product.name}` };
       }
-      
+
       soldItems.push({ product_code: product.code, name: product.name, qty: item.qty, price: product.price });
       totalSale += (product.price * item.qty);
     }
-// 3. Ejecutar actualizaciones atómicas individuales (para evitar permisos de SYSTEM:batch)
-for (const item of items) {
-  const index = stock.findIndex(p => p.code === item.code);
-  const product = stock[index];
-  const newQty = product.qty - item.qty;
 
-  // Usamos atomicUpdatePath para actualizar el valor escalar de 'qty'
-  const updateRes = await infraClient.atomicUpdatePath(context.tenantId, `stock[${index}].qty`, newQty, context.token);
-  if (!updateRes.success) return updateRes;
-}
+    // 3. Ejecutar actualizaciones atómicas individuales
+    for (const item of items) {
+      const index = stock.findIndex(p => p.code === item.code);
+      const product = stock[index];
+      const newQty = product.qty - item.qty;
+
+      const updateRes = await infraClient.atomicUpdatePath(context.tenantId, `stock[${index}].qty`, newQty, context.token);
+      if (!updateRes.success) {
+        console.log(`[DEBUG] Error en atomicUpdatePath:`, updateRes);
+        return updateRes;
+      }
+    }
 
 // 4. Crear registro de venta
 const saleId = `ORD-${Date.now()}`;
