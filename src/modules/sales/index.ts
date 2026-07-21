@@ -73,9 +73,10 @@ class SalesModule {
     for (const item of items) {
       const index = stock.findIndex(p => p.code === item.code);
       const product = stock[index];
-      const newQty = product.qty - item.qty;
-      
-      const updateRes = await infraClient.updatePath(context.tenantId, `stock[${index}].qty`, newQty, context.token);
+      const updatedProduct = { ...product, qty: product.qty - item.qty };
+
+      // Actualizamos el objeto completo en la posición 'index' usando dot notation
+      const updateRes = await infraClient.updatePath(context.tenantId, `stock.${index}`, updatedProduct, context.token);
       if (!updateRes.success) return updateRes;
     }
 
