@@ -35,6 +35,13 @@ class SalesModule {
       description: 'Obtiene el historial de ventas de la empresa',
       requiredRole: 'DUEÑO'
     }, this.getHistory);
+
+    // Resumen Consolidado de Ventas
+    dispatcher.register('sales.summary', {
+      name: 'sales.summary',
+      description: 'Obtiene el resumen consolidado de ventas por vendedor',
+      requiredRole: 'DUEÑO'
+    }, this.getSummary);
   }
 
   private async checkout(context: RequestContext, params: any): Promise<ServiceResponse> {
@@ -185,6 +192,48 @@ class SalesModule {
       user_id: context.userId,
       tenantId: context.tenantId
     }, context.token);
+  }
+
+  private async getSummary(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const ordersRes = await infraClient.readPath<any[]>(context.tenantId, 'sales_orders', context.token);
+    const itemsRes = await infraClient.readPath<any[]>(context.tenantId, 'sale_items', context.token);
+
+    if (!ordersRes.success) return ordersRes;
+    if (!itemsRes.success && itemsRes.error?.code !== 'PATH_NOT_FOUND') return itemsRes;
+
+    const orders = ordersRes.data || [];
+    const items = itemsRes.data || [];
+
+    const summary: any = {
+      total_ventas_24h: 0,
+      detalle_por_empleado: {}
+    };
+
+    orders.forEach(order => {
+      const orderItems = items.filter((i: any) => i.sale_id === order.id);
+      
+      // Asumimos que el empleado está registrado en la orden
+      const empleado = order.empleado || 'Desconocido';
+
+      if (!summary.detalle_por_empleado[empleado]) {
+        summary.detalle_por_empleado[empleado] = {
+          productos: [],
+          total_empleado: 0
+        };
+      }
+
+      orderItems.forEach((item: any) => {
+        summary.detalle_por_empleado[empleado].productos.push({
+          producto: item.product_code,
+          cantidad: item.quantity,
+          monto: item.subtotal
+        });
+        summary.detalle_por_empleado[empleado].total_empleado += item.subtotal;
+        summary.total_ventas_24h += item.subtotal;
+      });
+    });
+
+    return { success: true, data: { summary } };
   }
 
   private async getHistory(context: RequestContext, params: any): Promise<ServiceResponse> {
