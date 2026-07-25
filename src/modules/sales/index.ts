@@ -45,7 +45,7 @@ class SalesModule {
   }
 
   private async checkout(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const { items, customerId, clientTimestamp, client_request_id } = params;
+    const { items, customerId, clientTimestamp, client_request_id, ticket } = params;
     if (!items || !Array.isArray(items) || items.length === 0) {
       return { success: false, message: 'La lista de items es requerida' };
     }
@@ -76,30 +76,29 @@ class SalesModule {
       totalSale += (product.price * item.qty);
     }
 
-    // 3. Ejecutar actualizaciones (usando updatePath estándar)
+    // 3. Ejecutar actualizaciones
     for (const item of items) {
       const index = stock.findIndex(p => p.code === item.code);
       const product = stock[index];
       const updatedProduct = { ...product, qty: product.qty - item.qty };
-
-      // Actualizamos el objeto completo en la posición 'index' usando dot notation
       const updateRes = await infraClient.updatePath(context.tenantId, `stock.${index}`, updatedProduct, context.token);
       if (!updateRes.success) return updateRes;
     }
 
-    // 4. Crear registro de venta
+    // 4. Crear registro de venta (usando ticket si viene del front, o generando uno)
     const saleId = `ORD-${Date.now()}`;
     const saleRecord = {
       id: saleId,
       total: totalSale,
       items: soldItems,
       customerId,
-      createdAt: clientTimestamp || new Date().toISOString()
+      createdAt: clientTimestamp || new Date().toISOString(),
+      ticket: ticket || { items: soldItems, total_ticket: totalSale } // Persistimos el ticket
     };
     
     await infraClient.pushItem(context.tenantId, 'sales_orders', saleRecord, context.token);
 
-    // 5. Emitir evento único de auditoría (Consolidado)
+    // 5. Emitir evento único de auditoría
     await infraClient.execute('SYSTEM:log-event', {
       status: 'SUCCESS',
       command: 'sales.checkout-consolidated',
@@ -110,7 +109,7 @@ class SalesModule {
         resumen: `Venta: Total $${totalSale}`,
         detalle: { 
           total: totalSale, 
-          items: soldItems, // <--- Aquí pasamos los ítems completos
+          ticket: saleRecord.ticket, 
           client_request_id 
         }
       }
