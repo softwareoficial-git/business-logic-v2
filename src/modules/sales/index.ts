@@ -233,7 +233,7 @@ class SalesModule {
       });
     });
 
-    return { success: true, data: { summary } };
+    return { success: true, message: 'Resumen obtenido correctamente', data: { summary } };
   }
 
   private async getHistory(context: RequestContext, params: any): Promise<ServiceResponse> {
