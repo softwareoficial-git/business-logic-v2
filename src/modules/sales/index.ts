@@ -92,6 +92,8 @@ class SalesModule {
       total: totalSale,
       items: soldItems,
       customerId,
+      empleado: context.userId, // Guardamos ID del usuario
+      role: context.role,       // Guardamos el rol
       createdAt: clientTimestamp || new Date().toISOString(),
       ticket: ticket || { items: soldItems, total_ticket: totalSale } // Persistimos el ticket
     };
@@ -140,6 +142,8 @@ class SalesModule {
       total,
       payment_status: 'pending',
       client_request_id,
+      empleado: context.userId, // Guardamos ID del usuario
+      role: context.role,       // Guardamos el rol
       createdAt: clientTimestamp || new Date().toISOString()
     };
 
@@ -195,13 +199,10 @@ class SalesModule {
 
   private async getSummary(context: RequestContext, params: any): Promise<ServiceResponse> {
     const ordersRes = await infraClient.readPath<any[]>(context.tenantId, 'sales_orders', context.token);
-    const itemsRes = await infraClient.readPath<any[]>(context.tenantId, 'sale_items', context.token);
 
     if (!ordersRes.success) return ordersRes;
-    if (!itemsRes.success && itemsRes.error?.code !== 'PATH_NOT_FOUND') return itemsRes;
 
     const orders = ordersRes.data || [];
-    const items = itemsRes.data || [];
 
     const summary: any = {
       total_ventas_24h: 0,
@@ -209,9 +210,7 @@ class SalesModule {
     };
 
     orders.forEach(order => {
-      const orderItems = items.filter((i: any) => i.sale_id === order.id);
-      
-      // Asumimos que el empleado está registrado en la orden
+      // Usamos el campo 'empleado' que ahora guardamos
       const empleado = order.empleado || 'Desconocido';
 
       if (!summary.detalle_por_empleado[empleado]) {
@@ -221,14 +220,17 @@ class SalesModule {
         };
       }
 
+      // Si es un checkout, los items están en 'items' o 'ticket.items'
+      const orderItems = order.items || (order.ticket ? order.ticket.items : []);
+      
       orderItems.forEach((item: any) => {
         summary.detalle_por_empleado[empleado].productos.push({
-          producto: item.product_code,
-          cantidad: item.quantity,
-          monto: item.subtotal
+          producto: item.product_code || item.producto,
+          cantidad: item.qty || item.cantidad,
+          monto: item.price * item.qty || item.monto
         });
-        summary.detalle_por_empleado[empleado].total_empleado += item.subtotal;
-        summary.total_ventas_24h += item.subtotal;
+        summary.detalle_por_empleado[empleado].total_empleado += (item.price * item.qty || item.monto);
+        summary.total_ventas_24h += (item.price * item.qty || item.monto);
       });
     });
 
