@@ -210,8 +210,13 @@ class SalesModule {
     };
 
     orders.forEach(order => {
-      // Usamos el campo 'empleado' que ahora guardamos
-      const empleado = order.empleado || 'Desconocido';
+      // Identificar si la venta fue realizada por el DUEÑO o un empleado
+      let empleado = 'Desconocido';
+      if (order.role === 'DUEÑO') {
+        empleado = 'Dueño';
+      } else if (order.empleado) {
+        empleado = `Empleado (${order.empleado})`;
+      }
 
       if (!summary.detalle_por_empleado[empleado]) {
         summary.detalle_por_empleado[empleado] = {
