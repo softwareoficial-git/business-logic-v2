@@ -225,17 +225,35 @@ class SalesModule {
         };
       }
 
-      // Si es un checkout, los items están en 'items' o 'ticket.items'
-      const orderItems = order.items || (order.ticket ? order.ticket.items : []);
+      // Normalización robusta para capturar items independientemente del formato
+      let orderItems: any[] = [];
+      if (order.items && Array.isArray(order.items)) {
+        orderItems = order.items;
+      } else if (order.ticket && order.ticket.items && Array.isArray(order.ticket.items)) {
+        orderItems = order.ticket.items;
+      }
       
       orderItems.forEach((item: any) => {
+        // Normalización de campos: manejar tanto {name, qty, price} como {producto, cantidad, monto}
+        const nombre = item.name || item.producto || 'Producto';
+        const cantidad = Number(item.qty || item.cantidad || 0);
+        
+        // Calcular subtotal de forma segura
+        let subtotal = 0;
+        if (item.price !== undefined && item.qty !== undefined) {
+          subtotal = Number(item.price) * Number(item.qty);
+        } else if (item.monto !== undefined) {
+          subtotal = Number(item.monto);
+        }
+
         summary.detalle_por_empleado[empleado].productos.push({
-          producto: item.product_code || item.producto,
-          cantidad: item.qty || item.cantidad,
-          monto: item.price * item.qty || item.monto
+          producto: nombre,
+          cantidad: cantidad,
+          monto: subtotal
         });
-        summary.detalle_por_empleado[empleado].total_empleado += (item.price * item.qty || item.monto);
-        summary.total_ventas_24h += (item.price * item.qty || item.monto);
+        
+        summary.detalle_por_empleado[empleado].total_empleado += subtotal;
+        summary.total_ventas_24h += subtotal;
       });
     });
 
