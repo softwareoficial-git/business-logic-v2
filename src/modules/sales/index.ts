@@ -98,7 +98,7 @@ class SalesModule {
       ticket: ticket || { items: soldItems, total_ticket: totalSale } // Persistimos el ticket
     };
     
-    await infraClient.pushItem(context.tenantId, 'sales_orders', saleRecord, context.token);
+    await infraClient.pushItem(context.tenantId, 'sales', saleRecord, context.token);
 
     // 5. Emitir evento único de auditoría
     await infraClient.execute('SYSTEM:log-event', {
@@ -129,7 +129,7 @@ class SalesModule {
 
     // 1. Idempotency Check
     if (client_request_id) {
-      const res = await infraClient.queryJson<any>(context.tenantId, 'sales_orders', { client_request_id }, context.token);
+      const res = await infraClient.queryJson<any>(context.tenantId, 'sales', { client_request_id }, context.token);
       if (res.success && res.data && res.data.length > 0) {
         return { success: true, message: 'Sale already registered.', data: { sale_id: res.data[0].id } };
       }
@@ -147,7 +147,7 @@ class SalesModule {
       createdAt: clientTimestamp || new Date().toISOString()
     };
 
-    const saleRes = await infraClient.pushItem(context.tenantId, 'sales_orders', saleRecord, context.token);
+    const saleRes = await infraClient.pushItem(context.tenantId, 'sales', saleRecord, context.token);
     if (!saleRes.success) return saleRes;
 
     // 3. Items (Stored as a separate list)
@@ -170,12 +170,12 @@ class SalesModule {
 
     // 5. Actualización Quirúrgica del Link de Pago
     // Ya no leemos todo el array de órdenes, buscamos la posición y actualizamos solo el campo.
-    const ordersRes = await infraClient.readPath<any[]>(context.tenantId, 'sales_orders', context.token);
+    const ordersRes = await infraClient.readPath<any[]>(context.tenantId, 'sales', context.token);
     if (ordersRes.success && Array.isArray(ordersRes.data)) {
       const orders = ordersRes.data;
       const idx = orders.findIndex(o => o.id === saleId);
       if (idx !== -1) {
-        await infraClient.updatePath(context.tenantId, `sales_orders[${idx}].payment_link`, paymentLink, context.token);
+        await infraClient.updatePath(context.tenantId, `sales[${idx}].payment_link`, paymentLink, context.token);
       }
     }
 
@@ -198,7 +198,7 @@ class SalesModule {
   }
 
   private async getSummary(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const ordersRes = await infraClient.readPath<any[]>(context.tenantId, 'sales_orders', context.token);
+    const ordersRes = await infraClient.readPath<any[]>(context.tenantId, 'sales', context.token);
 
     if (!ordersRes.success) return ordersRes;
 
