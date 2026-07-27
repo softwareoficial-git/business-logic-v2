@@ -211,6 +211,7 @@ class StaffModule {
 
     return {
       success: true,
+      message: 'Empleados listados correctamente',
       data: res.data.results
     };
   }
