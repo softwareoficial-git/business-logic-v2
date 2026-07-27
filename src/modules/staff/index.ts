@@ -201,9 +201,18 @@ class StaffModule {
   }
 
   private listEmployees = async (context: RequestContext, params: any): Promise<ServiceResponse> => {
-    return infraClient.execute('CLIENT:user-list', {
-      clienteId: context.tenantId
+    const res = await infraClient.execute('USER:query-json', {
+      clienteId: context.tenantId,
+      path: 'employees',
+      filter: {}
     }, context.token);
+
+    if (!res.success) return res;
+
+    return {
+      success: true,
+      data: res.data.results
+    };
   }
 
   private async updatePermissions(context: RequestContext, params: any): Promise<ServiceResponse> {
