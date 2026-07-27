@@ -42,6 +42,20 @@ class StockModule {
       description: 'Elimina un producto del inventario',
       requiredRole: 'DUEÑO'
     }, this.deleteProduct);
+
+    // Obtener Necesidades de Reorden (Bajo Stock)
+    dispatcher.register('stock.get_reorder_needs', {
+      name: 'stock.get_reorder_needs',
+      description: 'Identifica productos con bajo stock y sugiere cantidades para reordenar',
+      requiredRole: 'DUEÑO' // Solo el DUEÑO debería ver esto
+    }, this.getReorderNeeds);
+
+    // Obtener Valor Total del Stock
+    dispatcher.register('stock.get_total_value', {
+      name: 'stock.get_total_value',
+      description: 'Calcula el valor monetario total de todo el inventario',
+      requiredRole: 'DUEÑO' // Solo el DUEÑO debería ver esto
+    }, this.getTotalValue);
   }
 
   private async addProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
@@ -149,6 +163,50 @@ class StockModule {
 
     // 3. Guardar array completo filtrado
     return infraClient.updatePath(context.tenantId, 'stock', updatedStock, context.token);
+  }
+
+  private async getTotalValue(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const res = await infraClient.readPath<any[]>(context.tenantId, 'stock', context.token);
+    if (!res.success) return res;
+
+    const stock = res.data || [];
+    const totalStockValue = stock.reduce((sum, item) => {
+      // Asegurarse de que price y qty sean números válidos
+      const price = Number(item.price);
+      const qty = Number(item.qty);
+      if (!isNaN(price) && !isNaN(qty)) {
+        return sum + (price * qty);
+      }
+      return sum; // Ignorar items con valores no numéricos
+    }, 0);
+
+    return {
+      success: true,
+      message: 'Valor total de stock calculado',
+      data: { totalStockValue: Number(totalStockValue.toFixed(2)) }
+    };
+  }
+
+  private async getReorderNeeds(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const { threshold = 3 } = params; // Umbral por defecto de 3 ítems
+
+    const res = await infraClient.readPath<any[]>(context.tenantId, 'stock', context.token);
+    if (!res.success) return res;
+
+    const stock = res.data || [];
+    const reorderNeeds = stock.filter(item => item.qty <= threshold).map(item => ({
+      productId: item.id || item.code, // Usar id o code como identificador
+      productName: item.name,
+      currentQty: item.qty,
+      minQty: threshold, // Mostrar el umbral aplicado
+      recommendedOrderQty: (threshold * 2) - item.qty // Sugerir el doble del umbral menos la cantidad actual
+    }));
+
+    return {
+      success: true,
+      message: 'Necesidades de reorden obtenidas',
+      data: reorderNeeds
+    };
   }
 }
 

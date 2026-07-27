@@ -31,6 +31,27 @@ class BusinessModule {
       requiredRole: 'DUEÑO',
       requiredPlan: 'free'
     }, this.getActivityLogs);
+
+    // Obtener Guías de Onboarding
+    dispatcher.register('business.get_onboarding_guides', {
+      name: 'business.get_onboarding_guides',
+      description: 'Proporciona guías y consejos para nuevos usuarios (onboarding)',
+      requiredRole: 'GUEST' // Accesible para cualquier usuario, incluso sin loguear, o EMPLEADO
+    }, this.getOnboardingGuides);
+
+    // Obtener Alertas de Negocio
+    dispatcher.register('business.get_business_alerts', {
+      name: 'business.get_business_alerts',
+      description: 'Obtiene alertas y notificaciones importantes del negocio',
+      requiredRole: 'DUEÑO'
+    }, this.getBusinessAlerts);
+
+    // Obtener Reportes Clave Ejecutivos
+    dispatcher.register('business.get_key_reports', {
+      name: 'business.get_key_reports',
+      description: 'Proporciona un resumen de reportes ejecutivos clave del negocio',
+      requiredRole: 'DUEÑO'
+    }, this.getKeyReports);
   }
 
   private async getActivityLogs(context: RequestContext, params: any): Promise<ServiceResponse> {
@@ -115,6 +136,55 @@ class BusinessModule {
     } catch (e: any) {
       return { success: false, message: e.message || 'Error obteniendo configuración' };
     }
+  }
+
+  private async getOnboardingGuides(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const { role } = params;
+    const guides: any[] = [];
+
+    // Guías para Dueño
+    if (role === 'DUEÑO') {
+      guides.push(
+        { title: 'Crea tu primer empleado', description: 'Accede al panel de personal y registra un nuevo empleado para tu negocio.', actionLink: '/employees' },
+        { title: 'Añade tu primer producto', description: 'Ve al panel de stock y registra tus productos iniciales con sus precios y cantidades.', actionLink: '/stock' },
+        { title: 'Realiza tu primera venta', description: 'Procesa una venta de prueba para familiarizarte con el flujo de negocio.', actionLink: '/sales' }
+      );
+    }
+
+    // Guías para Empleado
+    if (role === 'EMPLEADO') {
+      guides.push(
+        { title: 'Realiza una venta', description: 'Aprende a usar el módulo de ventas para registrar transacciones de clientes.', actionLink: '/sales' },
+        { title: 'Consulta el stock', description: 'Revisa el inventario disponible y las cantidades de los productos.', actionLink: '/stock' }
+      );
+    }
+
+    return { success: true, message: 'Guías de onboarding obtenidas', data: guides };
+  }
+
+  private async getBusinessAlerts(context: RequestContext, params: any): Promise<ServiceResponse> {
+    // Aquí la lógica para obtener alertas reales del negocio (ej. bajo stock, pagos fallidos)
+    // Por ahora, devolvemos alertas estáticas de ejemplo.
+    const alerts = [
+      { id: 'ALERT-001', type: 'stock_low', message: '¡Producto X bajo en stock! Cantidad actual: 5.', timestamp: new Date().toISOString(), severity: 'high' },
+      { id: 'ALERT-002', type: 'payment_fail', message: 'Fallo en el último intento de cobro a Cliente Y.', timestamp: new Date().toISOString(), severity: 'medium' },
+    ];
+    return { success: true, message: 'Alertas de negocio obtenidas', data: alerts };
+  }
+
+  private async getKeyReports(context: RequestContext, params: any): Promise<ServiceResponse> {
+    // Aquí la lógica para generar reportes ejecutivos clave (ej. resumen de caja, rentabilidad)
+    // Por ahora, devolvemos datos estáticos de ejemplo.
+    const reports = {
+      dailySummary: {
+        totalSales: 1500,
+        totalTickets: 10,
+        avgTicket: 150,
+      },
+      monthlyGrowth: '12%',
+      topSeller: 'Juan Perez'
+    };
+    return { success: true, message: 'Reportes clave obtenidos', data: reports };
   }
 }
 

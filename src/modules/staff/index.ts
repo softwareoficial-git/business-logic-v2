@@ -50,12 +50,26 @@ class StaffModule {
       requiredRole: 'DUEÑO'
     }, this.deleteEmployee);
 
+    // Cambiar Contraseña
+    dispatcher.register('staff.change_password', {
+      name: 'staff.change_password',
+      description: 'Cambia la contraseña de un empleado',
+      requiredRole: 'DUEÑO'
+    }, this.changePassword);
+
     // Monitoreo de Actividad
     dispatcher.register('staff.get_employee_activity', {
       name: 'staff.get_employee_activity',
       description: 'Consulta la línea de tiempo de actividades de un empleado',
       requiredRole: 'DUEÑO'
     }, this.getEmployeeActivity);
+
+    // Obtener Estado de Completado de Tareas
+    dispatcher.register('staff.get_task_completion_status', {
+      name: 'staff.get_task_completion_status',
+      description: 'Verifica el estado de completado de tareas de un empleado',
+      requiredRole: 'EMPLEADO' // Empleado puede ver sus propias tareas
+    }, this.getTaskCompletionStatus);
   }
 
   // ... (métodos existentes createEmployee, defineTerm, setGoal, listEmployees, updatePermissions, deleteEmployee)
@@ -251,8 +265,60 @@ class StaffModule {
     // 3. Filtrar el empleado
     const updatedEmployees = employees.filter(e => e.id !== userId);
 
-    // 4. Guardar array completo
+      // 4. Guardar array completo
     return infraClient.updatePath(context.tenantId, 'employees', updatedEmployees, context.token);
+  }
+
+  private async changePassword(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const { userId, newPassword } = params;
+    if (!userId || !newPassword) {
+      return { success: false, message: 'userId y newPassword son requeridos' };
+    }
+
+    // Delegar a la infraestructura el cambio de contraseña
+    return infraClient.execute('CLIENT:user-password-change', {
+      userId: userId,
+      newPassword: newPassword,
+      clienteId: context.tenantId
+    }, context.token);
+  }
+
+  private async getTaskCompletionStatus(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const { employeeId, taskId } = params;
+    const targetEmployeeId = employeeId || context.userId; // Si no se especifica, usa el del contexto
+
+    if (!targetEmployeeId) {
+      return { success: false, message: 'employeeId o userId en contexto son requeridos para consultar tareas.' };
+    }
+
+    const res = await infraClient.readPath<any[]>(context.tenantId, 'employees', context.token);
+    if (!res.success) return res;
+
+    const employees = res.data || [];
+    const employee = employees.find(e => String(e.id) === String(targetEmployeeId) || String(e.username) === String(targetEmployeeId));
+
+    if (!employee) {
+      return { success: false, message: 'Empleado no encontrado.' };
+    }
+
+    const goals = employee.goals || {};
+    const tasks = goals.task ? Object.values(goals.task) : [];
+
+    let filteredTasks = tasks;
+    if (taskId) {
+      filteredTasks = tasks.filter((t: any) => String(t.id) === String(taskId) || String(t.task) === String(taskId));
+    }
+
+    return {
+      success: true,
+      message: 'Estado de tareas obtenido.',
+      data: filteredTasks.map((task: any) => ({ 
+        taskId: task.id || task.task, 
+        taskName: task.task, 
+        details: task.details, 
+        status: task.status || 'pending' 
+      }))
+    };
   }
 }
 

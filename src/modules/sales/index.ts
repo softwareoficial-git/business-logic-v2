@@ -42,6 +42,20 @@ class SalesModule {
       description: 'Obtiene el resumen consolidado de ventas por vendedor',
       requiredRole: 'DUEÑO'
     }, this.getSummary);
+
+    // Obtener Resumen Mensual de Ventas
+    dispatcher.register('sales.get_monthly_summary', {
+      name: 'sales.get_monthly_summary',
+      description: 'Obtiene un resumen de ventas agrupado por mes',
+      requiredRole: 'DUEÑO'
+    }, this.getMonthlySummary);
+
+    // Obtener Total de Ventas del Día
+    dispatcher.register('sales.get_daily_total', {
+      name: 'sales.get_daily_total',
+      description: 'Calcula el total de ventas y tickets del día actual',
+      requiredRole: 'DUEÑO'
+    }, this.getDailyTotal);
   }
 
   private async checkout(context: RequestContext, params: any): Promise<ServiceResponse> {
@@ -268,8 +282,97 @@ class SalesModule {
     return res;
   }
 
-  private async getHistoryFixed(context: RequestContext, params: any): Promise<ServiceResponse> {
-    return infraClient.readPath(context.tenantId, 'sales.history', context.token);
+  private async getMonthlySummary(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const { month, year } = params; // month es 1-12, year es 2026, etc.
+    const targetMonth = month ? Number(month) : new Date().getMonth() + 1;
+    const targetYear = year ? Number(year) : new Date().getFullYear();
+
+    const res = await infraClient.readPath<any[]>(context.tenantId, 'sales', context.token);
+    if (!res.success) return res;
+    const allSales = res.data || [];
+
+    let totalSales = 0;
+    let totalTickets = 0;
+    const salesByMonth: { [key: string]: number } = {};
+    const topProducts: { [key: string]: { qty: number; total: number } } = {};
+
+    allSales.forEach(sale => {
+      const saleDate = new Date(sale.createdAt);
+      const saleMonth = saleDate.getMonth() + 1; // getMonth() es 0-11
+      const saleYear = saleDate.getFullYear();
+
+      if (saleMonth === targetMonth && saleYear === targetYear) {
+        totalSales += Number(sale.total || 0);
+        totalTickets += 1;
+
+        // Acumular ventas por mes (para el widget si se desea)
+        const monthKey = `${saleYear}-${String(saleMonth).padStart(2, '0')}`;
+        salesByMonth[monthKey] = (salesByMonth[monthKey] || 0) + Number(sale.total || 0);
+
+        // Acumular productos más vendidos
+        const items = sale.items || (sale.ticket ? sale.ticket.items : []);
+        items.forEach((item: any) => {
+          const productName = item.name || item.producto || 'Desconocido';
+          const qty = Number(item.qty || item.cantidad || 0);
+          const itemTotal = Number(item.price || item.monto || 0) * qty;
+          
+          if (!topProducts[productName]) {
+            topProducts[productName] = { qty: 0, total: 0 };
+          }
+          topProducts[productName].qty += qty;
+          topProducts[productName].total += itemTotal;
+        });
+      }
+    });
+
+    const sortedTopProducts = Object.entries(topProducts)
+      .sort(([, a], [, b]) => b.total - a.total)
+      .map(([name, data]) => ({ name, ...data }));
+
+    return {
+      success: true,
+      message: 'Resumen mensual de ventas obtenido',
+      data: {
+        month: targetMonth,
+        year: targetYear,
+        totalSales: Number(totalSales.toFixed(2)),
+        totalTickets,
+        topProducts: sortedTopProducts,
+        salesByMonth // Podría ser útil para gráficos
+      }
+    };
+  }
+
+  private async getDailyTotal(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Inicio del día
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1); // Inicio del día siguiente
+
+    const res = await infraClient.readPath<any[]>(context.tenantId, 'sales', context.token);
+    if (!res.success) return res;
+    const allSales = res.data || [];
+
+    let dailySalesTotal = 0;
+    let totalTicketsToday = 0;
+
+    allSales.forEach(sale => {
+      const saleDate = new Date(sale.createdAt);
+      if (saleDate >= today && saleDate < tomorrow) {
+        dailySalesTotal += Number(sale.total || 0);
+        totalTicketsToday += 1;
+      }
+    });
+
+    return {
+      success: true,
+      message: 'Total de ventas del día obtenido',
+      data: {
+        dailySalesTotal: Number(dailySalesTotal.toFixed(2)),
+        totalTicketsToday
+      }
+    };
   }
 }
 
