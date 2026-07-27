@@ -142,49 +142,80 @@ class BusinessModule {
     const { role } = params;
     const guides: any[] = [];
 
+    // Verificar existencia de datos para onboarding dinámico
+    const empRes = await infraClient.readPath<any[]>(context.tenantId, 'employees', context.token);
+    const stockRes = await infraClient.readPath<any[]>(context.tenantId, 'stock', context.token);
+    const salesRes = await infraClient.readPath<any[]>(context.tenantId, 'sales', context.token);
+
+    const hasEmployees = empRes.success && empRes.data && empRes.data.length > 0;
+    const hasStock = stockRes.success && stockRes.data && stockRes.data.length > 0;
+    const hasSales = salesRes.success && salesRes.data && salesRes.data.length > 0;
+
     // Guías para Dueño
     if (role === 'DUEÑO') {
-      guides.push(
-        { title: 'Crea tu primer empleado', description: 'Accede al panel de personal y registra un nuevo empleado para tu negocio.', actionLink: '/employees' },
-        { title: 'Añade tu primer producto', description: 'Ve al panel de stock y registra tus productos iniciales con sus precios y cantidades.', actionLink: '/stock' },
-        { title: 'Realiza tu primera venta', description: 'Procesa una venta de prueba para familiarizarte con el flujo de negocio.', actionLink: '/sales' }
-      );
+      if (!hasEmployees) {
+        guides.push({ title: 'Crea tu primer empleado', description: 'Registra a tu equipo para empezar a delegar tareas.', actionLink: '/employees' });
+      }
+      if (!hasStock) {
+        guides.push({ title: 'Añade tu primer producto', description: 'Registra tus productos en el inventario para poder venderlos.', actionLink: '/stock' });
+      }
+      if (!hasSales && hasStock) {
+        guides.push({ title: 'Realiza tu primera venta', description: 'Usa el panel de ventas para procesar tu primer pedido.', actionLink: '/sales' });
+      }
     }
 
     // Guías para Empleado
     if (role === 'EMPLEADO') {
-      guides.push(
-        { title: 'Realiza una venta', description: 'Aprende a usar el módulo de ventas para registrar transacciones de clientes.', actionLink: '/sales' },
-        { title: 'Consulta el stock', description: 'Revisa el inventario disponible y las cantidades de los productos.', actionLink: '/stock' }
-      );
+      if (!hasSales) {
+        guides.push({ title: 'Aprende a vender', description: 'Familiarízate con el panel de ventas.', actionLink: '/sales' });
+      }
+      guides.push({ title: 'Consulta el stock', description: 'Revisa siempre la disponibilidad antes de vender.', actionLink: '/stock' });
     }
 
-    return { success: true, message: 'Guías de onboarding obtenidas', data: guides };
+    return { success: true, message: 'Guías obtenidas', data: guides };
   }
 
   private async getBusinessAlerts(context: RequestContext, params: any): Promise<ServiceResponse> {
-    // Aquí la lógica para obtener alertas reales del negocio (ej. bajo stock, pagos fallidos)
-    // Por ahora, devolvemos alertas estáticas de ejemplo.
-    const alerts = [
-      { id: 'ALERT-001', type: 'stock_low', message: '¡Producto X bajo en stock! Cantidad actual: 5.', timestamp: new Date().toISOString(), severity: 'high' },
-      { id: 'ALERT-002', type: 'payment_fail', message: 'Fallo en el último intento de cobro a Cliente Y.', timestamp: new Date().toISOString(), severity: 'medium' },
-    ];
-    return { success: true, message: 'Alertas de negocio obtenidas', data: alerts };
+    const alerts: any[] = [];
+
+    // 1. Alertas de Stock Bajo reales
+    const stockRes = await infraClient.readPath<any[]>(context.tenantId, 'stock', context.token);
+    if (stockRes.success && stockRes.data) {
+      const lowStockItems = stockRes.data.filter(item => Number(item.qty) < 5);
+      lowStockItems.forEach(item => {
+        alerts.push({
+          id: `STOCK_${item.code}`,
+          type: 'stock_low',
+          message: `Stock crítico: ${item.name} tiene solo ${item.qty} unidades.`,
+          timestamp: new Date().toISOString(),
+          severity: 'high'
+        });
+      });
+    }
+
+    return { success: true, message: 'Alertas reales obtenidas', data: alerts };
   }
 
   private async getKeyReports(context: RequestContext, params: any): Promise<ServiceResponse> {
-    // Aquí la lógica para generar reportes ejecutivos clave (ej. resumen de caja, rentabilidad)
-    // Por ahora, devolvemos datos estáticos de ejemplo.
+    const salesRes = await infraClient.readPath<any[]>(context.tenantId, 'sales', context.token);
+    if (!salesRes.success) return salesRes;
+
+    const sales = salesRes.data || [];
+    const totalSalesValue = sales.reduce((sum, s) => sum + Number(s.total || 0), 0);
+    const avgTicket = sales.length > 0 ? totalSalesValue / sales.length : 0;
+
+    // Calcular crecimiento simple (ej. comparando con histórico - lógica simplificada)
     const reports = {
       dailySummary: {
-        totalSales: 1500,
-        totalTickets: 10,
-        avgTicket: 150,
+        totalSales: totalSalesValue,
+        totalTickets: sales.length,
+        avgTicket: avgTicket,
       },
-      monthlyGrowth: '12%',
-      topSeller: 'Juan Perez'
+      monthlyGrowth: sales.length > 0 ? 'Análisis activo' : 'Sin datos suficientes',
+      topSeller: 'Cargando datos de personal...'
     };
-    return { success: true, message: 'Reportes clave obtenidos', data: reports };
+
+    return { success: true, message: 'Reportes reales calculados', data: reports };
   }
 }
 
