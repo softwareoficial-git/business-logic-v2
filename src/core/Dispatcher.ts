@@ -19,7 +19,13 @@ interface RegisteredCommand {
 }
 
 class Dispatcher {
-  private registry: Map<string, RegisteredCommand> = new Map();
+  // Anchoring the registry in the global object for robust singleton persistence
+  private get registry(): Map<string, RegisteredCommand> {
+    if (!(global as any).__dispatcherRegistry) {
+      (global as any).__dispatcherRegistry = new Map<string, RegisteredCommand>();
+    }
+    return (global as any).__dispatcherRegistry;
+  }
 
   private readonly PLAN_WEIGHTS: Record<string, number> = {
     free: 0,
