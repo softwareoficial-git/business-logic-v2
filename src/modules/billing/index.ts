@@ -120,11 +120,14 @@ private getGatewayConfig = async (context: RequestContext, params: any): Promise
   // Si el tenant_id solicitado es 0 (plataforma), permitimos el acceso sin restricción de rol 
   // ya que es necesario para el procesamiento de webhooks internos.
   const targetTenant = tenant_id === 0 ? 0 : (context.role === 'SUPER_ADMIN' ? tenant_id : context.tenantId);
+  
+  // Usar el token del sistema si se consulta la plataforma
+  const token = targetTenant === 0 ? (process.env.SYSTEM_TOKEN || 'BOOTSTRAP_TOKEN') : context.token;
 
   return infraClient.execute('BILLING:get-config', {
     tenant_id: targetTenant,
     gateway_type
-  }, context.token || 'SYSTEM_TOKEN');
+  }, token);
 }
 
   // Obtener definición de planes
