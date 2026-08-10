@@ -55,8 +55,9 @@ class BillingModule {
   public async handlePaymentNotification(tenantId: number, paymentData: any, headers: any): Promise<void> {
     console.log(`[DEBUG] Buscando config para tenant: ${tenantId}`);
     
-    // 1. Obtener credenciales del tenant para validar firma
-    const configRes = await this.getGatewayConfig({} as RequestContext, {
+    // 1. Obtener credenciales del tenant usando un contexto con token de sistema
+    const systemContext = { token: process.env.SYSTEM_TOKEN || 'BOOTSTRAP_TOKEN' } as RequestContext;
+    const configRes = await this.getGatewayConfig(systemContext, {
         tenant_id: tenantId,
         gateway_type: 'mercadopago'
     });
