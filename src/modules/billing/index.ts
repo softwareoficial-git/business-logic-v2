@@ -56,9 +56,16 @@ class BillingModule {
     // 2. Crear preferencia
     const result = await preference.create({
       body: {
-        items: [{ id: plan, title: `Plan ${plan}`, quantity: 1, unit_price: amount }],
+        items: [{ 
+            id: plan, 
+            title: `Suscripción ${plan.toUpperCase()}`, 
+            description: `Acceso a beneficios del plan ${plan.toUpperCase()}: Soporte dedicado, herramientas avanzadas y gestión de empleados.`,
+            quantity: 1, 
+            unit_price: amount 
+        }],
         back_urls: { success: `${process.env.FRONTEND_URL}/profile` },
-        external_reference: JSON.stringify({ tenantId: context.tenantId, plan })
+        external_reference: JSON.stringify({ tenantId: context.tenantId, plan }),
+        auto_return: 'approved'
       }
     });
 
