@@ -36,20 +36,23 @@ app.post('/api/billing/webhook/:tenantId', async (req: Request, res: Response) =
   }
 });
 
-// Endpoint simulador
-app.post('/api/billing/simulate-payment', async (req: Request, res: Response) => {
-  const { clienteId, plan } = req.body;
+// Endpoint para crear preferencias de pago
+app.post('/api/billing/create-payment', async (req: Request, res: Response) => {
+  const { plan, amount, tenantId } = req.body;
   
+  // Obtenemos el contexto simulado para el usuario (o deberíamos usar el del middleware si fuera una ruta protegida)
+  const context = {
+      tenantId: parseInt(tenantId),
+      role: 'DUEÑO', // Asumimos rol para la prueba
+      token: process.env.SYSTEM_TOKEN || 'BOOTSTRAP_TOKEN'
+  } as RequestContext;
+
   try {
-    // Ejecutar el comando infraestructura directamente
-    const cmd = `node /home/adrian/infra-cli.js exec "APP:update-client-plan" --payload '{"clienteId": ${clienteId}, "plan": "${plan}"}'`;
-    console.log(`[SIMULADOR] Ejecutando: ${cmd}`);
-    await execPromise(cmd);
-    
-    res.json({ success: true, message: `Simulación exitosa: Plan ${plan} activado.` });
+    const result = await billingModule.createSubscriptionPreference(context, { plan, amount });
+    res.json(result);
   } catch (error) {
-    console.error('[SIMULADOR_ERROR]', error);
-    res.status(500).json({ success: false, error: 'Fallo al actualizar plan' });
+    console.error('[PAYMENT_ERROR]', error);
+    res.status(500).json({ success: false, message: 'Error al crear preferencia' });
   }
 });
 

@@ -52,6 +52,9 @@ class BillingModule {
     return { success: true, message: 'Preferencia creada', data: { init_point: result.init_point } };
   }
 
+import { MercadoPagoConfig, Preference, Webhook } from 'mercadopago';
+
+// ... (dentro de handlePaymentNotification)
   public async handlePaymentNotification(tenantId: number, paymentData: any, headers: any): Promise<void> {
     console.log(`[DEBUG] Buscando config para tenant: ${tenantId}`);
     
@@ -62,24 +65,28 @@ class BillingModule {
         gateway_type: 'mercadopago'
     });
 
-    console.log(`[DEBUG] Resultado de configRes:`, JSON.stringify(configRes));
-
     if (!configRes.success || !configRes.data || configRes.data.length === 0) {
-        console.error(`[WEBHOOK_ERROR] No se encontró config para tenant ${tenantId}`);
         throw new Error('Configuración no encontrada para el tenant');
     }
 
     const config = configRes.data[0].config_data;
     const secret = config.webhook_secret;
 
-    // 2. Validar firma (SDK de Mercado Pago)
-    // Nota: Requerimos importar Webhook de mercadopago
-    const isValid = true; // Placeholder: Aquí iría Webhook.validateSignature()
-    
-    if (!isValid) throw new Error('Firma inválida');
+    // 2. Validar firma real con SDK
+    const signature = headers['x-signature'];
+    const requestId = headers['x-request-id'];
 
-    // 3. Procesar pago y actualizar suscripción
-    // Asumimos que el pago es para suscripción PRO si el external_reference coincide
+    const isValid = await Webhook.validateSignature({
+        request: {
+            body: paymentData,
+            headers: { 'x-signature': signature, 'x-request-id': requestId }
+        },
+        webhookSecret: secret
+    });
+    
+    if (!isValid) throw new Error('Firma inválida de Mercado Pago');
+
+    // 3. Procesar pago...
     const externalRef = JSON.parse(paymentData.data?.external_reference || '{}');
     if (externalRef.plan === 'pro') {
         await this.initSubscription({} as RequestContext, { 
@@ -87,7 +94,7 @@ class BillingModule {
           days: 30, 
           plan: 'pro' 
         });
-        console.log(`[BILLING] Suscripción actualizada a PRO para tenant ${tenantId}`);
+        console.log(`[BILLING] Suscripción activada para tenant ${tenantId}`);
     }
   }
 
