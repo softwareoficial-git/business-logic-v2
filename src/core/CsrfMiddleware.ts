@@ -12,6 +12,11 @@ export const csrfMiddleware = (req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
+  // Omitir verificación para webhooks
+  if (req.path.startsWith('/api/billing/webhooks/')) {
+    return next();
+  }
+
   const csrfHeader = req.headers['x-requested-with'];
 
   if (csrfHeader === 'XMLHttpRequest') {
