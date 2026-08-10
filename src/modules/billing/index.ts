@@ -17,6 +17,13 @@ class BillingModule {
       requiredRole: 'DUEÑO'
     }, (ctx, params) => this.getGatewayConfig(ctx, params));
 
+    // Configurar Pasarela
+    dispatcher.register('BILLING:config', {
+      name: 'BILLING:config',
+      description: 'Configura las credenciales de la pasarela de pago',
+      requiredRole: 'DUEÑO'
+    }, (ctx, params) => this.configureGateway(ctx, params));
+
     // Generar link de pago para plataforma
     dispatcher.register('BILLING:create-preference', {
       name: 'BILLING:create-preference',
