@@ -13,7 +13,7 @@ export const csrfMiddleware = (req: Request, res: Response, next: NextFunction) 
   }
 
   // Omitir verificación para webhooks
-  if (req.path.startsWith('/api/billing/webhooks/')) {
+  if (req.path.startsWith('/api/billing/webhook/')) {
     return next();
   }
 
