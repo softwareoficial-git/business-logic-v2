@@ -9,12 +9,36 @@ import { RequestContext } from './core/RequestContext';
 import { csrfMiddleware } from './core/CsrfMiddleware';
 import { logger } from './core/Logger'; // Assuming Logger is moved to V2 or we use a simple console
 
+// ... (después de importaciones)
+import { exec } from 'child_process';
+import util from 'util';
+const execPromise = util.promisify(exec);
+
 // Middlewares basicos
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
 app.use(express.json());
 app.use(csrfMiddleware);
+
+// Endpoint simulador
+app.post('/api/billing/simulate-payment', async (req: Request, res: Response) => {
+  const { clienteId, plan } = req.body;
+  
+  try {
+    // Ejecutar el comando infraestructura directamente
+    const cmd = `node /home/adrian/infra-cli.js exec "APP:update-client-plan" --payload '{"clienteId": ${clienteId}, "plan": "${plan}"}'`;
+    console.log(`[SIMULADOR] Ejecutando: ${cmd}`);
+    await execPromise(cmd);
+    
+    res.json({ success: true, message: `Simulación exitosa: Plan ${plan} activado.` });
+  } catch (error) {
+    console.error('[SIMULADOR_ERROR]', error);
+    res.status(500).json({ success: false, error: 'Fallo al actualizar plan' });
+  }
+});
+
+// ... (resto de app.ts)
 
 // Middleware para construir el RequestContext desde las cookies/headers
 const contextMiddleware = async (req: Request, res: Response, next: NextFunction) => {

@@ -105,13 +105,21 @@ class SystemModule {
 
   private async getProfile(context: RequestContext, params: any): Promise<ServiceResponse> {
     try {
-      const res = await infraClient.execute('USER:get-profile', params, context.token);
-      if (!res.success) return res;
-      return {
-        success: true,
-        message: 'Profile retrieved successfully',
-        data: res.data
+      // 1. Obtener perfil básico
+      const profileRes = await infraClient.execute('USER:get-profile', params, context.token);
+      
+      // 2. Obtener estado de suscripción
+      const subRes = await infraClient.execute('USER:get-subscription-status', params, context.token);
+      
+      if (!profileRes.success) return profileRes;
+
+      // 3. Unificar datos
+      const fullProfile = {
+        ...profileRes.data,
+        subscription: subRes.success ? subRes.data : { status: 'unknown' }
       };
+
+      return { success: true, message: 'Profile retrieved successfully', data: fullProfile };
     } catch (e: any) {
       return { success: false, message: e.message || 'Profile error' };
     }
