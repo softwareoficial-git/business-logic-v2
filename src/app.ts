@@ -23,7 +23,7 @@ app.use(express.json());
 app.use(csrfMiddleware);
 
 // Webhook Dinámico por Tenant
-app.post('/api/billing/webhooks/:tenantId', async (req: Request, res: Response) => {
+app.post('/api/billing/webhook/:tenantId', async (req: Request, res: Response) => {
   const { tenantId } = req.params;
   console.log(`[WEBHOOK] Notificación directa recibida para tenant ${tenantId}`);
   try {
