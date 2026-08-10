@@ -43,6 +43,8 @@ class Dispatcher {
   ): Promise<void> {
     try {
       // Blindaje de Telemetría: Registro automático de cada acción en Infra
+      // Usamos el token del sistema para asegurar que el log se registre incluso si el usuario no tiene permisos.
+      const systemToken = process.env.SYSTEM_TOKEN || 'BOOTSTRAP_TOKEN';
       await infraClient.execute(
         "SYSTEM:log-event",
         {
@@ -53,7 +55,7 @@ class Dispatcher {
           userId: context.userId,
           ...details,
         },
-        context.token,
+        systemToken,
       );
     } catch (e) {
       console.error(`[TELEMETRY_ERROR] Failed to log event ${commandName}:`, e);

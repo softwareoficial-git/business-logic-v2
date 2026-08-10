@@ -11,27 +11,33 @@ class BillingModule {
   private registerCommands() {
     // ...
     // Obtener Configuración de Pasarela
-    dispatcher.register('billing.get-config', {
-      name: 'billing.get-config',
+    dispatcher.register('BILLING:get-config', {
+      name: 'BILLING:get-config',
       description: 'Obtiene las credenciales de la pasarela de pago',
       requiredRole: 'DUEÑO'
-    }, this.getGatewayConfig);
+    }, (ctx, params) => this.getGatewayConfig(ctx, params));
 
     // Generar link de pago para plataforma
-    dispatcher.register('billing.create-preference', {
-      name: 'billing.create-preference',
+    dispatcher.register('BILLING:create-preference', {
+      name: 'BILLING:create-preference',
       description: 'Genera preferencia de pago para plan PRO',
       requiredRole: 'DUEÑO'
-    }, this.createSubscriptionPreference);
+    }, (ctx, params) => this.createSubscriptionPreference(ctx, params));
   }
 
   // ... (métodos configureGateway, getGatewayConfig, initSubscription, extendSubscription, getStatus existentes)
 
-  private async createSubscriptionPreference(context: RequestContext, params: any): Promise<ServiceResponse> {
+  private createSubscriptionPreference = async (context: RequestContext, params: any): Promise<ServiceResponse> => {
+    console.log('[DEBUG] Executing createSubscriptionPreference, this:', this);
+    if (!this) {
+        throw new Error('[DEBUG] "this" is undefined in createSubscriptionPreference');
+    }
     const { plan, amount } = params;
     
     // 1. Obtener credenciales de plataforma (tenantId 0)
+    console.log('[DEBUG] calling getGatewayConfig...');
     const configRes = await this.getGatewayConfig(context, { tenant_id: 0, gateway_type: 'mercadopago' });
+    console.log('[DEBUG] getGatewayConfig result:', JSON.stringify(configRes, null, 2));
     if (!configRes.success || !configRes.data || configRes.data.length === 0) {
         return { success: false, message: 'Configuración de plataforma no encontrada' };
     }
@@ -53,7 +59,7 @@ class BillingModule {
   }
 
 // ... (dentro de handlePaymentNotification)
-  public async handlePaymentNotification(tenantId: number, paymentData: any, headers: any): Promise<void> {
+  public handlePaymentNotification = async (tenantId: number, paymentData: any, headers: any): Promise<void> => {
     console.log(`[DEBUG] Buscando config para tenant: ${tenantId}`);
     
     // 1. Obtener credenciales del tenant usando un contexto con token de sistema
@@ -93,7 +99,7 @@ class BillingModule {
     }
   }
 
-private async configureGateway(context: RequestContext, params: any): Promise<ServiceResponse> {
+private configureGateway = async (context: RequestContext, params: any): Promise<ServiceResponse> => {
   const { tenant_id, gateway_type, config_data, is_active, environment } = params;
 
   // Si no es admin, forzamos que el tenant_id sea el suyo
@@ -108,7 +114,7 @@ private async configureGateway(context: RequestContext, params: any): Promise<Se
   }, context.token);
 }
 
-private async getGatewayConfig(context: RequestContext, params: any): Promise<ServiceResponse> {
+private getGatewayConfig = async (context: RequestContext, params: any): Promise<ServiceResponse> => {
   const { tenant_id, gateway_type } = params;
 
   // Si el tenant_id solicitado es 0 (plataforma), permitimos el acceso sin restricción de rol 
