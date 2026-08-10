@@ -34,7 +34,8 @@ class ErrorHandler {
         };
     }
     static formatForFrontend(error) {
-        let userMessage = this.USER_MESSAGES[error.code] || "Ha ocurrido un error inesperado. Por favor, intenta más tarde.";
+        let userMessage = this.USER_MESSAGES[error.code] ||
+            "Ha ocurrido un error inesperado. Por favor, intenta más tarde.";
         // Generar mensajes dinámicos y soluciones basadas en el tipo de error de permisos
         if (error.code === "ROLE_INSUFFICIENT" && error.details) {
             const { requiredRole, currentRole } = error.details;
@@ -67,4 +68,5 @@ ErrorHandler.USER_MESSAGES = {
     VALIDATION_ERROR: "Datos de entrada no válidos. Causa: Uno o más campos enviados no cumplen con los requisitos obligatorios o el formato esperado. Solución: Revisa los mensajes de error en los campos del formulario y asegúrate de completar toda la información requerida.",
     INSUFFICIENT_STOCK: "Stock insuficiente. Causa: La cantidad solicitada supera las existencias actuales en el inventario. Solución: Verifica la disponibilidad del producto en el módulo de Stock o ajusta la cantidad en tu pedido antes de confirmar la venta.",
     USER_NOT_FOUND: "Usuario no encontrado. Causa: El ID o nombre de usuario proporcionado no existe en nuestra base de datos. Solución: Verifica que hayas escrito correctamente los datos del usuario o intenta buscarlo nuevamente.",
+    PARTIAL_SUCCESS_STOCK_UPDATED: "Venta procesada parcialmente. Causa: Se descontó el stock correctamente, pero hubo un problema técnico al registrar la venta en el historial. Solución: El stock está actualizado, por favor notifica al soporte técnico sobre el error en el registro del historial.",
 };

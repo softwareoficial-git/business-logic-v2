@@ -7,11 +7,14 @@ exports.infraClient = void 0;
 const axios_1 = __importDefault(require("axios"));
 class InfraClient {
     constructor() {
-        this.baseUrl = "http://localhost:3001";
+        this.baseUrl = process.env.DB_URL || "http://localhost:3001";
         this.httpClient = axios_1.default.create({
             baseURL: this.baseUrl,
             timeout: 15000,
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${process.env.DB_TOKEN || ""}`,
+            },
         });
     }
     async execute(cmd, payload, token) {
@@ -42,10 +45,12 @@ class InfraClient {
             else {
                 return {
                     success: false,
-                    message: result.error?.message || "La infraestructura devolvió un error en la ejecución del comando.",
+                    message: result.error?.message ||
+                        "La infraestructura devolvió un error en la ejecución del comando.",
                     error: {
                         code: result.error?.code || "INFRA_EXECUTION_ERROR",
-                        message: result.error?.message || "Se produjo un error interno en el motor de infraestructura al procesar la solicitud.",
+                        message: result.error?.message ||
+                            "Se produjo un error interno en el motor de infraestructura al procesar la solicitud.",
                         details: result.error?.details,
                     },
                 };
@@ -71,11 +76,10 @@ class InfraClient {
         return this.execute("USER:update-path", { clienteId, path, value }, token);
     }
     async pushItem(clienteId, path, item, token) {
-        // OPTIMIZACIÓN DE BLINDAJE: Eliminamos el ciclo Read-Modify-Write.
-        // Delegamos la operación de 'push' directamente a Infra Engine usando su comando nativo.
-        // Esto evita que el servidor V2 tenga que leer arrays gigantes, modificarlos y re-escribirlos,
-        // eliminando colisiones en ventas simultáneas y optimizando la carga masiva.
         return this.execute("USER:push-item", { clienteId, path, item }, token);
+    }
+    async batch(commands, token) {
+        return this.execute("SYSTEM:batch", { commands }, token);
     }
     async queryJson(clienteId, path, filter, token) {
         return this.execute("USER:query-json", { clienteId, path, filter }, token);

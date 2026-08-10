@@ -44,7 +44,7 @@ class Dispatcher {
         }
         const { handler, metadata } = command;
         // Bypass RBAC and Plan validation for profile verification used in middleware
-        if (commandName === 'USER:get-profile' && context.role === 'GUEST') {
+        if (commandName === "USER:get-profile" && context.role === "GUEST") {
             try {
                 const result = await handler(context, params);
                 return result;
@@ -61,7 +61,10 @@ class Dispatcher {
                 error: {
                     code: "ROLE_INSUFFICIENT",
                     message: "No tienes el nivel de acceso necesario para esta operación.",
-                    details: { requiredRole: metadata.requiredRole, currentRole: context.role }
+                    details: {
+                        requiredRole: metadata.requiredRole,
+                        currentRole: context.role,
+                    },
                 },
             };
         }
@@ -76,7 +79,7 @@ class Dispatcher {
                 error: {
                     code: "PLAN_INSUFFICIENT",
                     message: "Tu plan actual no incluye esta funcionalidad.",
-                    details: { requiredPlan, currentPlan: userPlan }
+                    details: { requiredPlan, currentPlan: userPlan },
                 },
             };
         }

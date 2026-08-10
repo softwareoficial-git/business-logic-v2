@@ -7,18 +7,59 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const Dispatcher_1 = require("./core/Dispatcher");
+const InfraClient_1 = require("./core/InfraClient");
 const ErrorHandler_1 = require("./core/ErrorHandler");
+const CsrfMiddleware_1 = require("./core/CsrfMiddleware");
+const billing_1 = require("./modules/billing");
+// ... (después de importaciones)
+const child_process_1 = require("child_process");
+const util_1 = __importDefault(require("util"));
+const execPromise = util_1.default.promisify(child_process_1.exec);
 // Middlewares basicos
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)({ origin: true, credentials: true }));
 app.use((0, cookie_parser_1.default)());
 app.use(express_1.default.json());
+app.use(CsrfMiddleware_1.csrfMiddleware);
+// Webhook Dinámico por Tenant
+app.post('/api/billing/webhook/:tenantId', async (req, res) => {
+    const { tenantId } = req.params;
+    console.log(`[WEBHOOK] Notificación directa recibida para tenant ${tenantId}`);
+    try {
+        // Invocamos el handler pasando el tenantId y el body completo para validación
+        await billing_1.billingModule.handlePaymentNotification(parseInt(tenantId), req.body, req.headers);
+        res.status(200).send('OK');
+    }
+    catch (error) {
+        console.error(`[WEBHOOK_ERROR] Tenant: ${tenantId}`, error);
+        res.status(500).send('Error');
+    }
+});
+// Endpoint para crear preferencias de pago
+app.post('/api/billing/create-payment', async (req, res) => {
+    const { plan, amount, tenantId } = req.body;
+    // Obtenemos el contexto simulado para el usuario (o deberíamos usar el del middleware si fuera una ruta protegida)
+    const context = {
+        tenantId: parseInt(tenantId),
+        role: 'DUEÑO', // Asumimos rol para la prueba
+        token: process.env.SYSTEM_TOKEN || 'BOOTSTRAP_TOKEN'
+    };
+    try {
+        const result = await Dispatcher_1.dispatcher.execute('billing.create-preference', { plan, amount }, context);
+        res.json(result);
+    }
+    catch (error) {
+        console.error('[PAYMENT_ERROR]', error);
+        res.status(500).json({ success: false, message: 'Error al crear preferencia' });
+    }
+});
+// ... (resto de app.ts)
 // Middleware para construir el RequestContext desde las cookies/headers
 const contextMiddleware = async (req, res, next) => {
     const token = req.cookies.session_token || req.headers.authorization?.toString().replace('Bearer ', '');
     const { cmd } = req.body;
-    // Permitir login sin token
-    if (cmd === 'USER:login') {
+    // Permitir login y track-visit sin token
+    if (cmd === 'USER:login' || cmd === 'ANALYTICS:track-visit') {
         req.context = {
             tenantId: 0,
             userId: 'guest',
@@ -54,7 +95,7 @@ const contextMiddleware = async (req, res, next) => {
         }
         const user = profileResult.data.profile;
         req.context = {
-            tenantId: user.cliente_id || 0,
+            tenantId: user.cliente_id,
             userId: user.id ? user.id.toString() : 'unknown',
             role: user.role_name || 'USER',
             plan: 'pro',
@@ -83,7 +124,7 @@ app.post('/register', async (req, res) => {
     try {
         // Importante: Usamos el comando exacto que Infra Engine reconoce: 'APP:self-register'
         // Pasamos el payload directamente. InfraClient.execute ya envuelve esto en { token, cmd, payload }
-        const result = await infraClient.execute('APP:self-register', {
+        const result = await InfraClient_1.infraClient.execute('APP:self-register', {
             username,
             password,
             nombreCliente,
@@ -128,12 +169,16 @@ app.post('/execute', contextMiddleware, async (req, res) => {
         if (cmd === 'USER:login' && result.data?.token) {
             res.cookie('session_token', result.data.token, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
+                secure: true,
+                sameSite: 'none',
+                partitioned: true,
                 maxAge: 24 * 60 * 60 * 1000 // 24 hours
             });
-            // Remove token from the JSON response so the frontend never sees it
+            // Include token in user object for cross-origin compatibility, instead of removing it
             const { token, ...restData } = result.data;
+            if (restData.user) {
+                restData.user.token = token;
+            }
             result.data = { ...restData, sessionEstablished: true };
         }
         // If the command was logout, clear the session cookie

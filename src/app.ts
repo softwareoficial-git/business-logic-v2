@@ -48,7 +48,7 @@ app.post('/api/billing/create-payment', async (req: Request, res: Response) => {
   } as RequestContext;
 
   try {
-    const result = await billingModule.createSubscriptionPreference(context, { plan, amount });
+    const result = await dispatcher.execute('billing.create-preference', { plan, amount }, context);
     res.json(result);
   } catch (error) {
     console.error('[PAYMENT_ERROR]', error);

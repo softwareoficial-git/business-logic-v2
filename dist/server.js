@@ -15,6 +15,7 @@ const business_1 = require("./modules/business");
 const crm_1 = require("./modules/crm");
 const operations_1 = require("./modules/operations");
 const registration_1 = require("./modules/registration");
+const import_1 = require("./modules/import");
 async function bootstrap() {
     try {
         console.log('🚀 Starting Business Logic Engine V2...');
@@ -30,6 +31,7 @@ async function bootstrap() {
         crm_1.crmModule;
         operations_1.operationsModule;
         registration_1.registrationModule;
+        import_1.importModule;
         const port = parseInt(process.env.PORT || '9002', 10);
         const server = http_1.default.createServer(app_1.default);
         server.listen(port, '0.0.0.0', () => {

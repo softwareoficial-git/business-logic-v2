@@ -47,8 +47,8 @@ class SystemModule {
             requiredRole: 'SISTEMA_ADMIN'
         }, this.setupTenant);
         // Rastreo de Visitas (Público)
-        Dispatcher_1.dispatcher.register('system.track_visit', {
-            name: 'system.track_visit',
+        Dispatcher_1.dispatcher.register('ANALYTICS:track-visit', {
+            name: 'ANALYTICS:track-visit',
             description: 'Rastrea visitas al sitio web automáticamente',
             requiredRole: 'GUEST'
         }, this.trackVisit);
@@ -68,7 +68,7 @@ class SystemModule {
         Dispatcher_1.dispatcher.register('system.audit.logs', {
             name: 'system.audit.logs',
             description: 'Obtiene el historial de auditoría de la aplicación',
-            requiredRole: 'SISTEMA_ADMIN'
+            requiredRole: 'DUEÑO'
         }, this.getAuditLogs);
     }
     async login(context, params) {
@@ -93,14 +93,18 @@ class SystemModule {
     }
     async getProfile(context, params) {
         try {
-            const res = await InfraClient_1.infraClient.execute('USER:get-profile', params, context.token);
-            if (!res.success)
-                return res;
-            return {
-                success: true,
-                message: 'Profile retrieved successfully',
-                data: { profile: res.data }
+            // 1. Obtener perfil básico
+            const profileRes = await InfraClient_1.infraClient.execute('USER:get-profile', params, context.token);
+            // 2. Obtener estado de suscripción
+            const subRes = await InfraClient_1.infraClient.execute('USER:get-subscription-status', params, context.token);
+            if (!profileRes.success)
+                return profileRes;
+            // 3. Unificar datos
+            const fullProfile = {
+                ...profileRes.data,
+                subscription: subRes.success ? subRes.data : { status: 'unknown' }
             };
+            return { success: true, message: 'Profile retrieved successfully', data: fullProfile };
         }
         catch (e) {
             return { success: false, message: e.message || 'Profile error' };

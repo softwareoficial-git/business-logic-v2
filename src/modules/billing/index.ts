@@ -1,7 +1,7 @@
 import { dispatcher } from '../../core/Dispatcher';
 import { infraClient, ServiceResponse } from '../../core/InfraClient';
 import { RequestContext } from '../../core/RequestContext';
-import { MercadoPagoConfig, Preference } from 'mercadopago';
+import { MercadoPagoConfig, Preference, WebhookSignatureValidator } from 'mercadopago';
 
 class BillingModule {
   constructor() {
@@ -52,8 +52,6 @@ class BillingModule {
     return { success: true, message: 'Preferencia creada', data: { init_point: result.init_point } };
   }
 
-import { MercadoPagoConfig, Preference, Webhook } from 'mercadopago';
-
 // ... (dentro de handlePaymentNotification)
   public async handlePaymentNotification(tenantId: number, paymentData: any, headers: any): Promise<void> {
     console.log(`[DEBUG] Buscando config para tenant: ${tenantId}`);
@@ -76,15 +74,12 @@ import { MercadoPagoConfig, Preference, Webhook } from 'mercadopago';
     const signature = headers['x-signature'];
     const requestId = headers['x-request-id'];
 
-    const isValid = await Webhook.validateSignature({
-        request: {
-            body: paymentData,
-            headers: { 'x-signature': signature, 'x-request-id': requestId }
-        },
-        webhookSecret: secret
+    WebhookSignatureValidator.validate({
+        xSignature: signature,
+        xRequestId: requestId,
+        dataId: paymentData.data?.id,
+        secret: secret
     });
-    
-    if (!isValid) throw new Error('Firma inválida de Mercado Pago');
 
     // 3. Procesar pago...
     const externalRef = JSON.parse(paymentData.data?.external_reference || '{}');
