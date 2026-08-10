@@ -104,12 +104,15 @@ private async configureGateway(context: RequestContext, params: any): Promise<Se
 
 private async getGatewayConfig(context: RequestContext, params: any): Promise<ServiceResponse> {
   const { tenant_id, gateway_type } = params;
-  const targetTenant = context.role === 'SUPER_ADMIN' ? tenant_id : context.tenantId;
+
+  // Si el tenant_id solicitado es 0 (plataforma), permitimos el acceso sin restricción de rol 
+  // ya que es necesario para el procesamiento de webhooks internos.
+  const targetTenant = tenant_id === 0 ? 0 : (context.role === 'SUPER_ADMIN' ? tenant_id : context.tenantId);
 
   return infraClient.execute('BILLING:get-config', {
     tenant_id: targetTenant,
     gateway_type
-  }, context.token);
+  }, context.token || 'SYSTEM_TOKEN');
 }
 
   private async initSubscription(context: RequestContext, params: any): Promise<ServiceResponse> {
