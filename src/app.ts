@@ -8,6 +8,7 @@ import { ErrorHandler } from './core/ErrorHandler';
 import { RequestContext } from './core/RequestContext';
 import { csrfMiddleware } from './core/CsrfMiddleware';
 import { logger } from './core/Logger'; // Assuming Logger is moved to V2 or we use a simple console
+import { billingModule } from './modules/billing';
 
 // ... (después de importaciones)
 import { exec } from 'child_process';
@@ -20,6 +21,20 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
 app.use(express.json());
 app.use(csrfMiddleware);
+
+// Webhook Dinámico por Tenant
+app.post('/api/billing/webhooks/:tenantId', async (req: Request, res: Response) => {
+  const { tenantId } = req.params;
+  console.log(`[WEBHOOK] Notificación directa recibida para tenant ${tenantId}`);
+  try {
+    // Invocamos el handler pasando el tenantId y el body completo para validación
+    await billingModule.handlePaymentNotification(parseInt(tenantId), req.body, req.headers);
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error(`[WEBHOOK_ERROR] Tenant: ${tenantId}`, error);
+    res.status(500).send('Error');
+  }
+});
 
 // Endpoint simulador
 app.post('/api/billing/simulate-payment', async (req: Request, res: Response) => {
