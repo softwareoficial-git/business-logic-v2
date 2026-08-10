@@ -119,6 +119,31 @@ private async getGatewayConfig(context: RequestContext, params: any): Promise<Se
   }, context.token || 'SYSTEM_TOKEN');
 }
 
+  // Obtener definición de planes
+  public async getPlans(context: RequestContext): Promise<ServiceResponse> {
+    return infraClient.execute('BILLING:list-plans', {}, context.token || 'SYSTEM_TOKEN');
+  }
+
+  // Obtener detalles de un plan específico
+  public async getPlanDetails(context: RequestContext, planId: string): Promise<any> {
+    const plansRes = await this.getPlans(context);
+    if (!plansRes.success) throw new Error('No se pudieron obtener los planes');
+    return plansRes.data.find((p: any) => p.id === planId);
+  }
+
+  // Inicializar o actualizar suscripción (actualiza private_config en clientes)
+  public async activatePlan(context: RequestContext, tenantId: number, planId: string): Promise<ServiceResponse> {
+    const plan = await this.getPlanDetails(context, planId);
+    if (!plan) return { success: false, message: 'Plan no válido' };
+
+    // Mapeamos a la lógica existente de initSubscription
+    return await this.initSubscription(context, { 
+      clienteId: tenantId, 
+      days: plan.duration_days, 
+      plan: plan.id 
+    });
+  }
+
   private async initSubscription(context: RequestContext, params: any): Promise<ServiceResponse> {
     const { clienteId, days = 30, plan = 'basic' } = params;
     if (!clienteId) return { success: false, message: 'clienteId es requerido' };
