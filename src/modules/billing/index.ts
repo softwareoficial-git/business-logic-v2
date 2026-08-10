@@ -53,12 +53,15 @@ class BillingModule {
   }
 
   public async handlePaymentNotification(tenantId: number, paymentData: any, headers: any): Promise<void> {
+    console.log(`[DEBUG] Buscando config para tenant: ${tenantId}`);
+    
     // 1. Obtener credenciales del tenant para validar firma
-    // Usamos context vacío y payload directo
     const configRes = await this.getGatewayConfig({} as RequestContext, {
         tenant_id: tenantId,
         gateway_type: 'mercadopago'
     });
+
+    console.log(`[DEBUG] Resultado de configRes:`, JSON.stringify(configRes));
 
     if (!configRes.success || !configRes.data || configRes.data.length === 0) {
         console.error(`[WEBHOOK_ERROR] No se encontró config para tenant ${tenantId}`);
