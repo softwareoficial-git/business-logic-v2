@@ -8,6 +8,7 @@ import { salesModule } from './modules/sales';
 import { billingModule } from './modules/billing';
 import { compatibilityModule } from './modules/compatibility';
 import { searchModule } from './modules/search';
+import { settingsModule } from './modules/settings';
 import { systemModule } from './modules/system';
 import { businessModule } from './modules/business';
 import { crmModule } from './modules/crm';
@@ -35,6 +36,7 @@ async function bootstrap() {
     importModule;
     compatibilityModule;
     searchModule;
+    settingsModule;
 
     const port = parseInt(process.env.PORT || '9002', 10);
 
