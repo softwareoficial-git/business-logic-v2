@@ -9,7 +9,7 @@ export type CommandHandler = (
 export interface CommandMetadata {
   name: string;
   description: string;
-  requiredRole: "SISTEMA_ADMIN" | "DUEÑO" | "EMPLEADO" | "GUEST";
+  requiredRole: "SISTEMA_ADMIN" | "DUEÑO" | "EMPLEADO" | "GUEST" | "PARTNER";
   requiredPlan?: "free" | "pro" | "enterprise";
 }
 
@@ -163,6 +163,7 @@ class Dispatcher {
       SISTEMA_ADMIN: 3,
       DUEÑO: 2,
       EMPLEADO: 1,
+      PARTNER: 1,
       GUEST: 0,
     };
 

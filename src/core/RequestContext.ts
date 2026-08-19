@@ -8,4 +8,5 @@ export interface RequestContext {
   requestId: string;
   userAgent?: string;
   ipAddress?: string;
+  permissions?: string[];
 }

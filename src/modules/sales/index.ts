@@ -1,6 +1,7 @@
 import { dispatcher } from '../../core/Dispatcher';
 import { infraClient, ServiceResponse } from '../../core/InfraClient';
 import { RequestContext } from '../../core/RequestContext';
+import { compositionModule } from '../composition';
 
 class SalesModule {
   constructor() {
@@ -76,18 +77,36 @@ class SalesModule {
     for (const item of items) {
       const index = stock.findIndex(p => p.code === item.code);
       if (index === -1) {
-        console.log(`[DEBUG] Producto no encontrado:`, item.code);
         return { success: false, message: `Producto ${item.code} no encontrado` };
       }
 
       const product = stock[index];
       if (product.qty < item.qty) {
-        console.log(`[DEBUG] Stock insuficiente para:`, product.name, 'Necesita:', item.qty, 'Tiene:', product.qty);
         return { success: false, message: `Stock insuficiente para ${product.name}` };
       }
 
-      soldItems.push({ product_code: product.code, name: product.name, qty: item.qty, price: product.price });
-      totalSale += (product.price * item.qty);
+      let lineTotal = product.price * item.qty;
+      let lineDetails: any[] = [];
+
+      // Soporte para composición (variantes)
+      if (product.options_schema && item.selections) {
+          const validation = compositionModule.validateSelections(product.options_schema, item.selections);
+          if (!validation.valid) return { success: false, message: validation.message || 'Error en variantes' };
+          
+          const calculation = compositionModule.calculateTotal(product.price, product.options_schema, item.selections);
+          lineTotal = calculation.subtotal * item.qty;
+          lineDetails = calculation.details;
+      }
+
+      soldItems.push({ 
+          product_code: product.code, 
+          name: product.name, 
+          qty: item.qty, 
+          price: lineTotal / item.qty, // Precio unitario final
+          subtotal: lineTotal,
+          details: lineDetails
+      });
+      totalSale += lineTotal;
     }
 
     // 3. Ejecutar actualizaciones

@@ -6,6 +6,8 @@ import { staffModule } from './modules/staff';
 import { stockModule } from './modules/stock';
 import { salesModule } from './modules/sales';
 import { billingModule } from './modules/billing';
+import { compatibilityModule } from './modules/compatibility';
+import { searchModule } from './modules/search';
 import { systemModule } from './modules/system';
 import { businessModule } from './modules/business';
 import { crmModule } from './modules/crm';
@@ -31,6 +33,8 @@ async function bootstrap() {
     operationsModule;
     registrationModule;
     importModule;
+    compatibilityModule;
+    searchModule;
 
     const port = parseInt(process.env.PORT || '9002', 10);
 

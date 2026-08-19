@@ -7,6 +7,7 @@ import { infraClient } from './core/InfraClient';
 import { ErrorHandler } from './core/ErrorHandler';
 import { RequestContext } from './core/RequestContext';
 import { csrfMiddleware } from './core/CsrfMiddleware';
+import { partnerAuth } from './core/PartnerAuthMiddleware';
 import { logger } from './core/Logger'; // Assuming Logger is moved to V2 or we use a simple console
 import { billingModule } from './modules/billing';
 
@@ -20,7 +21,14 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
 app.use(express.json());
-app.use(csrfMiddleware);
+
+// Middleware CSRF condicional: excluir rutas de API
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
+  csrfMiddleware(req, res, next);
+});
 
 // Webhook Dinámico por Tenant
 app.post('/api/billing/webhook/:tenantId', async (req: Request, res: Response) => {
@@ -209,6 +217,28 @@ app.post('/execute', contextMiddleware, async (req: Request, res: Response) => {
     }
     // --------------------------------
 
+    res.json(result);
+  } catch (error: any) {
+    const appError = ErrorHandler.handle(error);
+    res.status(appError.statusCode).json(ErrorHandler.formatForFrontend(appError));
+  }
+});
+
+// Nueva ruta para partners externos
+app.post('/api/partner/execute', partnerAuth, async (req: Request, res: Response) => {
+  const { cmd, params } = req.body;
+  const context = (req as any).context as RequestContext;
+
+  if (!context.permissions || !context.permissions.includes(cmd)) {
+    return res.status(403).json({ success: false, message: 'Permiso denegado para este comando' });
+  }
+
+  try {
+    const result = await dispatcher.execute(cmd, params || {}, context);
+    if (!result.success) {
+      const appError = ErrorHandler.handle(result);
+      return res.status(appError.statusCode).json(ErrorHandler.formatForFrontend(appError));
+    }
     res.json(result);
   } catch (error: any) {
     const appError = ErrorHandler.handle(error);
