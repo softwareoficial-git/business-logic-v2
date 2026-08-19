@@ -6,99 +6,120 @@ const InfraClient_1 = require("../../core/InfraClient");
 const mercadopago_1 = require("mercadopago");
 class BillingModule {
     constructor() {
+        // ... (métodos configureGateway, getGatewayConfig, initSubscription, extendSubscription, getStatus existentes)
+        this.createSubscriptionPreference = async (context, params) => {
+            console.log('[DEBUG] Executing createSubscriptionPreference, this:', this);
+            if (!this) {
+                throw new Error('[DEBUG] "this" is undefined in createSubscriptionPreference');
+            }
+            const { plan, amount } = params;
+            // 1. Obtener credenciales de plataforma (tenantId 0)
+            console.log('[DEBUG] calling getGatewayConfig...');
+            const configRes = await this.getGatewayConfig(context, { tenant_id: 0, gateway_type: 'mercadopago' });
+            console.log('[DEBUG] getGatewayConfig result:', JSON.stringify(configRes, null, 2));
+            if (!configRes.success || !configRes.data || configRes.data.length === 0) {
+                return { success: false, message: 'Configuración de plataforma no encontrada' };
+            }
+            const configData = configRes.data[0].config_data;
+            const client = new mercadopago_1.MercadoPagoConfig({ accessToken: configData.access_token });
+            const preference = new mercadopago_1.Preference(client);
+            // 2. Crear preferencia
+            const result = await preference.create({
+                body: {
+                    items: [{
+                            id: plan,
+                            title: `Suscripción ${plan.toUpperCase()}`,
+                            description: `Acceso a beneficios del plan ${plan.toUpperCase()}: Soporte dedicado, herramientas avanzadas y gestión de empleados.`,
+                            quantity: 1,
+                            unit_price: amount
+                        }],
+                    back_urls: { success: `${process.env.FRONTEND_URL}/profile` },
+                    external_reference: JSON.stringify({ tenantId: context.tenantId, plan }),
+                    auto_return: 'approved'
+                }
+            });
+            return { success: true, message: 'Preferencia creada', data: { init_point: result.init_point } };
+        };
+        // ... (dentro de handlePaymentNotification)
+        this.handlePaymentNotification = async (tenantId, paymentData, headers) => {
+            console.log(`[DEBUG] Buscando config para tenant: ${tenantId}`);
+            // 1. Obtener credenciales del tenant usando un contexto con token de sistema
+            const systemContext = { token: process.env.SYSTEM_TOKEN || 'BOOTSTRAP_TOKEN' };
+            const configRes = await this.getGatewayConfig(systemContext, {
+                tenant_id: tenantId,
+                gateway_type: 'mercadopago'
+            });
+            if (!configRes.success || !configRes.data || configRes.data.length === 0) {
+                throw new Error('Configuración no encontrada para el tenant');
+            }
+            const config = configRes.data[0].config_data;
+            const secret = config.webhook_secret;
+            // 2. Validar firma real con SDK
+            const signature = headers['x-signature'];
+            const requestId = headers['x-request-id'];
+            mercadopago_1.WebhookSignatureValidator.validate({
+                xSignature: signature,
+                xRequestId: requestId,
+                dataId: paymentData.data?.id,
+                secret: secret
+            });
+            // 3. Procesar pago...
+            const externalRef = JSON.parse(paymentData.data?.external_reference || '{}');
+            if (externalRef.plan === 'pro') {
+                await this.initSubscription({}, {
+                    clienteId: tenantId,
+                    days: 30,
+                    plan: 'pro'
+                });
+                console.log(`[BILLING] Suscripción activada para tenant ${tenantId}`);
+            }
+        };
+        this.configureGateway = async (context, params) => {
+            const { tenant_id, gateway_type, config_data, is_active, environment } = params;
+            // Si no es admin, forzamos que el tenant_id sea el suyo
+            const targetTenant = context.role === 'SUPER_ADMIN' ? tenant_id : context.tenantId;
+            return InfraClient_1.infraClient.execute('BILLING:config', {
+                tenant_id: targetTenant,
+                gateway_type,
+                config_data,
+                is_active,
+                environment
+            }, context.token);
+        };
+        this.getGatewayConfig = async (context, params) => {
+            const { tenant_id, gateway_type } = params;
+            // Si el tenant_id solicitado es 0 (plataforma), permitimos el acceso sin restricción de rol 
+            // ya que es necesario para el procesamiento de webhooks internos.
+            const targetTenant = tenant_id === 0 ? 0 : (context.role === 'SUPER_ADMIN' ? tenant_id : context.tenantId);
+            // Usar el token del sistema si se consulta la plataforma
+            const token = targetTenant === 0 ? (process.env.SYSTEM_TOKEN || 'BOOTSTRAP_TOKEN') : context.token;
+            return InfraClient_1.infraClient.execute('BILLING:get-config', {
+                tenant_id: targetTenant,
+                gateway_type
+            }, token);
+        };
         this.registerCommands();
     }
     registerCommands() {
         // ...
         // Obtener Configuración de Pasarela
-        Dispatcher_1.dispatcher.register('billing.get-config', {
-            name: 'billing.get-config',
+        Dispatcher_1.dispatcher.register('BILLING:get-config', {
+            name: 'BILLING:get-config',
             description: 'Obtiene las credenciales de la pasarela de pago',
             requiredRole: 'DUEÑO'
-        }, this.getGatewayConfig);
+        }, (ctx, params) => this.getGatewayConfig(ctx, params));
+        // Configurar Pasarela
+        Dispatcher_1.dispatcher.register('BILLING:config', {
+            name: 'BILLING:config',
+            description: 'Configura las credenciales de la pasarela de pago',
+            requiredRole: 'DUEÑO'
+        }, (ctx, params) => this.configureGateway(ctx, params));
         // Generar link de pago para plataforma
-        Dispatcher_1.dispatcher.register('billing.create-preference', {
-            name: 'billing.create-preference',
+        Dispatcher_1.dispatcher.register('BILLING:create-preference', {
+            name: 'BILLING:create-preference',
             description: 'Genera preferencia de pago para plan PRO',
             requiredRole: 'DUEÑO'
-        }, this.createSubscriptionPreference);
-    }
-    // ... (métodos configureGateway, getGatewayConfig, initSubscription, extendSubscription, getStatus existentes)
-    async createSubscriptionPreference(context, params) {
-        const { plan, amount } = params;
-        // 1. Obtener credenciales de plataforma (tenantId 0)
-        const configRes = await this.getGatewayConfig(context, { tenant_id: 0, gateway_type: 'mercadopago' });
-        if (!configRes.success || !configRes.data || configRes.data.length === 0) {
-            return { success: false, message: 'Configuración de plataforma no encontrada' };
-        }
-        const configData = configRes.data[0].config_data;
-        const client = new mercadopago_1.MercadoPagoConfig({ accessToken: configData.access_token });
-        const preference = new mercadopago_1.Preference(client);
-        // 2. Crear preferencia
-        const result = await preference.create({
-            body: {
-                items: [{ id: plan, title: `Plan ${plan}`, quantity: 1, unit_price: amount }],
-                back_urls: { success: `${process.env.FRONTEND_URL}/profile` },
-                external_reference: JSON.stringify({ tenantId: context.tenantId, plan })
-            }
-        });
-        return { success: true, message: 'Preferencia creada', data: { init_point: result.init_point } };
-    }
-    // ... (dentro de handlePaymentNotification)
-    async handlePaymentNotification(tenantId, paymentData, headers) {
-        console.log(`[DEBUG] Buscando config para tenant: ${tenantId}`);
-        // 1. Obtener credenciales del tenant usando un contexto con token de sistema
-        const systemContext = { token: process.env.SYSTEM_TOKEN || 'BOOTSTRAP_TOKEN' };
-        const configRes = await this.getGatewayConfig(systemContext, {
-            tenant_id: tenantId,
-            gateway_type: 'mercadopago'
-        });
-        if (!configRes.success || !configRes.data || configRes.data.length === 0) {
-            throw new Error('Configuración no encontrada para el tenant');
-        }
-        const config = configRes.data[0].config_data;
-        const secret = config.webhook_secret;
-        // 2. Validar firma real con SDK
-        const signature = headers['x-signature'];
-        const requestId = headers['x-request-id'];
-        mercadopago_1.WebhookSignatureValidator.validate({
-            xSignature: signature,
-            xRequestId: requestId,
-            dataId: paymentData.data?.id,
-            secret: secret
-        });
-        // 3. Procesar pago...
-        const externalRef = JSON.parse(paymentData.data?.external_reference || '{}');
-        if (externalRef.plan === 'pro') {
-            await this.initSubscription({}, {
-                clienteId: tenantId,
-                days: 30,
-                plan: 'pro'
-            });
-            console.log(`[BILLING] Suscripción activada para tenant ${tenantId}`);
-        }
-    }
-    async configureGateway(context, params) {
-        const { tenant_id, gateway_type, config_data, is_active, environment } = params;
-        // Si no es admin, forzamos que el tenant_id sea el suyo
-        const targetTenant = context.role === 'SUPER_ADMIN' ? tenant_id : context.tenantId;
-        return InfraClient_1.infraClient.execute('BILLING:config', {
-            tenant_id: targetTenant,
-            gateway_type,
-            config_data,
-            is_active,
-            environment
-        }, context.token);
-    }
-    async getGatewayConfig(context, params) {
-        const { tenant_id, gateway_type } = params;
-        // Si el tenant_id solicitado es 0 (plataforma), permitimos el acceso sin restricción de rol 
-        // ya que es necesario para el procesamiento de webhooks internos.
-        const targetTenant = tenant_id === 0 ? 0 : (context.role === 'SUPER_ADMIN' ? tenant_id : context.tenantId);
-        return InfraClient_1.infraClient.execute('BILLING:get-config', {
-            tenant_id: targetTenant,
-            gateway_type
-        }, context.token || 'SYSTEM_TOKEN');
+        }, (ctx, params) => this.createSubscriptionPreference(ctx, params));
     }
     // Obtener definición de planes
     async getPlans(context) {

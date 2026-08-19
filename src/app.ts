@@ -68,6 +68,7 @@ app.post('/api/billing/create-payment', async (req: Request, res: Response) => {
 
 // Middleware para construir el RequestContext desde las cookies/headers
 const contextMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+  console.log('[DEBUG] Cookies recibidas:', req.cookies);
   const token = req.cookies.session_token || req.headers.authorization?.toString().replace('Bearer ', '');
   const { cmd } = req.body;
   
@@ -197,9 +198,8 @@ app.post('/execute', contextMiddleware, async (req: Request, res: Response) => {
     if (cmd === 'USER:login' && result.data?.token) {
       res.cookie('session_token', result.data.token, {
         httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        partitioned: true,
+        secure: false, // Cambiado para desarrollo local
+        sameSite: 'lax', // Cambiado para desarrollo local
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
       });
       
