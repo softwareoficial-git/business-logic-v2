@@ -8,6 +8,7 @@ const PARTNER_DB: Record<string, { tenantId: number, permissions: string[] }> = 
 
 export const partnerAuth = (req: Request, res: Response, next: NextFunction) => {
   const apiKey = req.headers['x-api-key'] as string;
+  const requestedTenantId = parseInt(req.headers['x-tenant-id'] as string) || (req.body?.params?.tenantId as number);
   
   if (!apiKey || !PARTNER_DB[apiKey]) {
     return res.status(403).json({ success: false, message: 'Partner no autorizado o API Key faltante' });
@@ -15,12 +16,17 @@ export const partnerAuth = (req: Request, res: Response, next: NextFunction) => 
   
   const partner = PARTNER_DB[apiKey];
   
+  // Si la clave tiene permiso global, permitimos especificar el tenant, sino forzamos el del partner
+  const tenantId = (partner.permissions.includes('admin.global') && requestedTenantId) 
+    ? requestedTenantId 
+    : partner.tenantId;
+
   // Inyectamos el contexto de partner al request
   (req as any).context = {
-    tenantId: partner.tenantId,
+    tenantId: tenantId,
     role: 'PARTNER',
     plan: 'pro',
-    token: 'PARTNER_SYSTEM_TOKEN', // Token interno del sistema
+    token: 'PARTNER_SYSTEM_TOKEN', 
     source: 'PARTNER_API',
     permissions: partner.permissions,
     requestId: req.headers['x-request-id'] || 'partner-req'
