@@ -37,6 +37,33 @@ export class DataEngine {
     return res.rowCount !== null && res.rowCount > 0;
   }
 
+  // Métodos para Schema dinámico (restaurados)
+  async createField(label: string, parentFieldId?: string): Promise<string> {
+    const data = await this.getNamespace('dynamic_catalog');
+    if (!data.meta) data.meta = { next_field_id: 1, next_value_id: 1 };
+    
+    const fieldId = `field_${data.meta.next_field_id}`;
+    if (!data.fields) data.fields = {};
+    data.fields[fieldId] = { label, is_relational: true, parent_field_id: parentFieldId };
+    data.meta.next_field_id++;
+    
+    await this.saveNamespace('dynamic_catalog', data);
+    return fieldId;
+  }
+
+  async createValue(fieldId: string, value: string, parentId?: string): Promise<string> {
+    const data = await this.getNamespace('dynamic_catalog');
+    if (!data.meta) data.meta = { next_field_id: 1, next_value_id: 1 };
+    
+    const valueId = `val_${data.meta.next_value_id}`;
+    if (!data.values) data.values = {};
+    data.values[valueId] = { field_id: fieldId, value, parent_id: parentId };
+    data.meta.next_value_id++;
+    
+    await this.saveNamespace('dynamic_catalog', data);
+    return valueId;
+  }
+
   // --- MÉTODOS DE NEGOCIO (EL CEREBRO) ---
 
   async getProductFullData(productCode: string): Promise<any> {
