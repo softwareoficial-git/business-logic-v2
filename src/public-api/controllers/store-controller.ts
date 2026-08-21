@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import { PublicProductService } from '../product-service';
 import { TenantService } from '../tenant-service';
+import { DataEngine } from '../../core/DataEngine';
 
 export class PublicStoreController {
-  // Nueva ruta: Resolución por nombre (slug)
+  
   static async getProductsByName(req: Request, res: Response) {
     try {
       const { tenantName } = req.params;
@@ -15,13 +16,17 @@ export class PublicStoreController {
       
       const filters = req.query;
       
-      const products = await PublicProductService.getProducts(tenantId.toString(), filters);
+      const [products, settings] = await Promise.all([
+        PublicProductService.getProducts(tenantId.toString(), filters),
+        new DataEngine(tenantId, process.env.SYSTEM_TOKEN || 'BOOTSTRAP_TOKEN').getNamespace('settings')
+      ]);
       
       res.json({
         success: true,
         tenantName,
         tenantId,
         count: products.length,
+        settings,
         data: products
       });
     } catch (error: any) {
@@ -29,7 +34,6 @@ export class PublicStoreController {
     }
   }
 
-  // Endpoint para verificar la disponibilidad de un nombre de tienda (slug)
   static async checkStoreNameAvailability(req: Request, res: Response) {
     try {
       const { storeNameSlug } = req.params;
@@ -37,7 +41,7 @@ export class PublicStoreController {
       
       res.json({
         success: true,
-        isAvailable: tenantId === null, // Si no encuentra un ID, está disponible
+        isAvailable: tenantId === null,
         message: tenantId === null ? 'Nombre de tienda disponible' : 'Nombre de tienda ya en uso'
       });
     } catch (error: any) {
@@ -46,21 +50,25 @@ export class PublicStoreController {
     }
   }
 
-  // Mantenemos la ruta original por si se necesita
   static async getProducts(req: Request, res: Response) {
     try {
       const { tenantId } = req.params;
       const filters = req.query;
       
-      const [products, tenantName] = await Promise.all([
+      const systemToken = process.env.SYSTEM_TOKEN || 'BOOTSTRAP_TOKEN';
+      const engine = new DataEngine(parseInt(tenantId), systemToken);
+      
+      const [products, tenantName, settings] = await Promise.all([
         PublicProductService.getProducts(tenantId, filters),
-        TenantService.getTenantName(tenantId)
+        TenantService.getTenantName(tenantId),
+        engine.getNamespace('settings')
       ]);
       
       res.json({
         success: true,
         tenantName,
         count: products.length,
+        settings,
         data: products
       });
     } catch (error: any) {

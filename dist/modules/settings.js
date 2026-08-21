@@ -3,6 +3,26 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.settingsModule = void 0;
 const Dispatcher_1 = require("../core/Dispatcher");
 const InfraClient_1 = require("../core/InfraClient");
+function isObject(item) {
+    return (item && typeof item === 'object' && !Array.isArray(item));
+}
+function deepMerge(target, source) {
+    const output = Object.assign({}, target);
+    if (isObject(target) && isObject(source)) {
+        Object.keys(source).forEach(key => {
+            if (isObject(source[key])) {
+                if (!(key in target))
+                    Object.assign(output, { [key]: source[key] });
+                else
+                    output[key] = deepMerge(target[key], source[key]);
+            }
+            else {
+                Object.assign(output, { [key]: source[key] });
+            }
+        });
+    }
+    return output;
+}
 class SettingsModule {
     constructor() {
         this.registerCommands();
@@ -35,7 +55,7 @@ class SettingsModule {
         // Leemos la configuración actual para hacer un merge
         const currentRes = await InfraClient_1.infraClient.readPath(context.tenantId, 'settings', context.token);
         const currentSettings = currentRes.success && currentRes.data ? currentRes.data : {};
-        const newSettings = { ...currentSettings, ...settings };
+        const newSettings = deepMerge(currentSettings, settings);
         return await InfraClient_1.infraClient.updatePath(context.tenantId, 'settings', newSettings, context.token);
     }
 }

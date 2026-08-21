@@ -40,6 +40,7 @@ app.use((req, res, next) => {
 // NUEVA RUTA: API PÚBLICA DE PRODUCTOS (Solo lectura)
 app.get('/api/public/store/:tenantId/products', store_controller_1.PublicStoreController.getProducts);
 app.get('/api/public/store/name/:tenantName/products', store_controller_1.PublicStoreController.getProductsByName);
+app.get('/api/public/store/check-name/:storeNameSlug', store_controller_1.PublicStoreController.checkStoreNameAvailability);
 // Webhook Dinámico por Tenant
 app.post('/api/billing/webhook/:tenantId', async (req, res) => {
     const { tenantId } = req.params;
