@@ -53,7 +53,7 @@ class StockModule {
   }
 
   private async addProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const { code, name, price, qty, category, ...metadata } = params;
+    const { code, name, price, qty, category, metadata = {} } = params;
     
     if (!code || !name || price === undefined || qty === undefined || !category) {
       return { 
@@ -65,20 +65,17 @@ class StockModule {
     const engine = new DataEngine(context.tenantId, context.token);
     const stock = await engine.getNamespace('stock');
     
-    stock[code] = { code, name, price, qty, category, metadata };
+    // Asegurarse de que metadata sea un objeto, no una cadena stringificada
+    const cleanMetadata = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+    
+    stock[code] = { code, name, price, qty, category, metadata: cleanMetadata };
     
     await engine.saveNamespace('stock', stock);
     return { success: true, message: 'Producto añadido correctamente' };
   }
 
-  private async listStock(context: RequestContext): Promise<ServiceResponse> {
-    const engine = new DataEngine(context.tenantId, context.token);
-    const stock = await engine.getNamespace('stock');
-    return { success: true, message: 'OK', data: Object.values(stock) };
-  }
-
   private async updateProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const { code, ...updates } = params;
+    const { code, metadata: newMetadata = {}, ...updates } = params;
     if (!code) return { success: false, message: 'El campo "code" es obligatorio' };
 
     const engine = new DataEngine(context.tenantId, context.token);
@@ -86,22 +83,26 @@ class StockModule {
         await engine.updateItem('stock', code, (item) => {
             // Separar campos base de los metadatos
             const baseFields = ['code', 'name', 'price', 'qty', 'category'];
-            const newMetadata: Record<string, any> = {};
             const cleanUpdates: Record<string, any> = {};
 
             Object.entries(updates).forEach(([key, value]) => {
                 if (baseFields.includes(key)) {
                     cleanUpdates[key] = value;
-                } else {
-                    newMetadata[key] = value; // Todo lo demás es metadato
                 }
             });
 
-            // Fusionar: item.metadata existente + nuevos metadatos
-            const mergedMetadata = {
-                ...(item.metadata || {}),
-                ...newMetadata
-            };
+            // Asegurarse de que newMetadata sea un objeto
+            const cleanNewMetadata = typeof newMetadata === 'string' ? JSON.parse(newMetadata) : newMetadata;
+
+            // Fusionar: item.metadata existente + nuevos metadatos (normalizando claves)
+            const currentMetadata = item.metadata || {};
+            const mergedMetadata = { ...currentMetadata };
+            
+            Object.entries(cleanNewMetadata).forEach(([key, value]) => {
+                // Normalizar clave buscando una existente que coincida en minúsculas
+                const existingKey = Object.keys(mergedMetadata).find(k => k.toLowerCase() === key.toLowerCase());
+                mergedMetadata[existingKey || key] = value;
+            });
 
             return { 
                 ...item, 
@@ -171,6 +172,12 @@ class StockModule {
       }));
 
     return { success: true, message: 'OK', data: reorderNeeds };
+  }
+
+  private async listStock(context: RequestContext): Promise<ServiceResponse> {
+    const engine = new DataEngine(context.tenantId, context.token);
+    const stock = await engine.getNamespace('stock');
+    return { success: true, message: 'OK', data: Object.values(stock) };
   }
 }
 
