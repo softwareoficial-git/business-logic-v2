@@ -20,6 +20,23 @@ class ProductModule {
       description: 'Búsqueda avanzada por marca, calidad, marco o nombre',
       requiredRole: 'EMPLEADO'
     }, this.searchProducts.bind(this));
+
+    dispatcher.register('product.add', {
+      name: 'product.add',
+      description: 'Crea un nuevo producto en el catálogo dinámico',
+      requiredRole: 'EMPLEADO'
+    }, this.addProduct.bind(this));
+  }
+
+  private async addProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const { code, name, category_id, model_ids, metadata } = params;
+    const engine = new DataEngine(context.tenantId, context.token);
+    
+    const productos = await engine.getNamespace('productos');
+    productos[code] = { code, name, category_id, model_ids, metadata };
+    
+    await engine.saveNamespace('productos', productos);
+    return { success: true, message: 'Producto creado exitosamente' };
   }
 
   private async getProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
