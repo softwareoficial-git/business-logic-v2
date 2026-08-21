@@ -62,7 +62,18 @@ class SalesModule {
     async getHistory(context) {
         const engine = new DataEngine_1.DataEngine(context.tenantId, context.token);
         const sales = await engine.getNamespace('sales');
-        return { success: true, message: 'OK', data: Object.values(sales) };
+        let salesArray = [];
+        if (Array.isArray(sales)) {
+            // Legacy format
+            salesArray = sales;
+        }
+        else if (typeof sales === 'object' && sales !== null) {
+            // New DataEngine object format
+            salesArray = Object.values(sales);
+        }
+        // Sanitization: Ensure only valid objects with an 'id' are returned
+        const cleanSales = salesArray.filter((s) => s && typeof s === 'object' && s.id);
+        return { success: true, message: 'OK', data: cleanSales };
     }
 }
 exports.salesModule = new SalesModule();
