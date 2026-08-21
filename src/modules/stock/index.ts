@@ -83,7 +83,32 @@ class StockModule {
 
     const engine = new DataEngine(context.tenantId, context.token);
     try {
-        await engine.updateItem('stock', code, (item) => ({ ...item, ...updates }));
+        await engine.updateItem('stock', code, (item) => {
+            // Separar campos base de los metadatos
+            const baseFields = ['code', 'name', 'price', 'qty', 'category'];
+            const newMetadata: Record<string, any> = {};
+            const cleanUpdates: Record<string, any> = {};
+
+            Object.entries(updates).forEach(([key, value]) => {
+                if (baseFields.includes(key)) {
+                    cleanUpdates[key] = value;
+                } else {
+                    newMetadata[key] = value; // Todo lo demás es metadato
+                }
+            });
+
+            // Fusionar: item.metadata existente + nuevos metadatos
+            const mergedMetadata = {
+                ...(item.metadata || {}),
+                ...newMetadata
+            };
+
+            return { 
+                ...item, 
+                ...cleanUpdates, 
+                metadata: mergedMetadata 
+            };
+        });
         return { success: true, message: 'Producto actualizado' };
     } catch (e: any) {
         return { success: false, message: e.message };

@@ -69,7 +69,30 @@ class StockModule {
             return { success: false, message: 'El campo "code" es obligatorio' };
         const engine = new DataEngine_1.DataEngine(context.tenantId, context.token);
         try {
-            await engine.updateItem('stock', code, (item) => ({ ...item, ...updates }));
+            await engine.updateItem('stock', code, (item) => {
+                // Separar campos base de los metadatos
+                const baseFields = ['code', 'name', 'price', 'qty', 'category'];
+                const newMetadata = {};
+                const cleanUpdates = {};
+                Object.entries(updates).forEach(([key, value]) => {
+                    if (baseFields.includes(key)) {
+                        cleanUpdates[key] = value;
+                    }
+                    else {
+                        newMetadata[key] = value; // Todo lo demás es metadato
+                    }
+                });
+                // Fusionar: item.metadata existente + nuevos metadatos
+                const mergedMetadata = {
+                    ...(item.metadata || {}),
+                    ...newMetadata
+                };
+                return {
+                    ...item,
+                    ...cleanUpdates,
+                    metadata: mergedMetadata
+                };
+            });
             return { success: true, message: 'Producto actualizado' };
         }
         catch (e) {
