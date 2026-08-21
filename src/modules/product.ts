@@ -29,41 +29,97 @@ class ProductModule {
   }
 
   private async addProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const { code, name, category_id, model_ids, metadata } = params;
+    const { code, name, categoryLabel, price, qty, dynamicAttributes = {} } = params;
+    
+    if (!code || !name || !categoryLabel || price === undefined || qty === undefined) {
+      return { 
+        success: false, 
+        message: 'Faltan datos obligatorios: code, name, categoryLabel, price y qty' 
+      };
+    }
+
     const engine = new DataEngine(context.tenantId, context.token);
     
+    // Resolver category_id (campo padre principal)
+    const categoryId = await engine.ensureValueId('Categoría', categoryLabel);
+
+    // Resolver atributos dinámicos y sus valores a IDs
+    const resolvedAttributes: { [key: string]: string | string[] } = {};
+    const attributeValueIds: string[] = []; // Lista plana de todos los IDs de atributos para búsqueda rápida
+
+    for (const fieldLabel in dynamicAttributes) {
+      const values = Array.isArray(dynamicAttributes[fieldLabel]) 
+        ? dynamicAttributes[fieldLabel] 
+        : [dynamicAttributes[fieldLabel]];
+      
+      const fieldAttributeIds: string[] = [];
+      for (const valueLabel of values) {
+        // Asumimos 'Marca' es el padre de 'Modelo' y 'Ingrediente' puede tener 'Marca' como padre lógico
+        // Esto requeriría una lógica más compleja de parentesco si se tienen múltiples niveles
+        const parentValueLabel = fieldLabel === 'Modelo' ? (dynamicAttributes['Marca'] || categoryLabel) : undefined;
+        const valueId = await engine.ensureValueId(fieldLabel, valueLabel, parentValueLabel);
+        fieldAttributeIds.push(valueId);
+        attributeValueIds.push(valueId); 
+      }
+      resolvedAttributes[fieldLabel] = fieldAttributeIds;
+    }
+
     const productos = await engine.getNamespace('productos');
-    productos[code] = { code, name, category_id, model_ids, metadata };
+    
+    productos[code] = { 
+      code, 
+      name, 
+      price, 
+      qty,
+      category_id: categoryId,
+      attributes: resolvedAttributes, // Atributos resueltos por campo (ej. Marca: [val_samsung])
+      attribute_value_ids: attributeValueIds // Todos los IDs de atributos para búsqueda eficiente
+    };
     
     await engine.saveNamespace('productos', productos);
     return { success: true, message: 'Producto creado exitosamente' };
   }
 
-  private async getProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const { productCode } = params;
-    if (!productCode) return { success: false, message: 'productCode es requerido' };
-
-    const engine = new DataEngine(context.tenantId, context.token);
-    const product = await engine.getProductFullData(productCode);
-
-    if (!product) {
-      return { success: false, message: 'Producto no encontrado' };
-    }
-
-    return { success: true, message: 'OK', data: product };
-  }
-
   private async searchProducts(context: RequestContext, params: any): Promise<ServiceResponse> {
     const { query = '' } = params;
+    const q = query.toLowerCase();
+
     const engine = new DataEngine(context.tenantId, context.token);
     const productos = await engine.getNamespace('productos');
-    
+    const catalog = await engine.getNamespace('dynamic_catalog');
+
     const results = Object.values(productos).filter((p: any) => {
-      const searchString = `${p.name || ''} ${p.metadata?.marca || ''} ${p.metadata?.calidad || ''} ${p.metadata?.marco || ''}`.toLowerCase();
-      return query.toLowerCase().split(' ').every((q: string) => searchString.includes(q));
+      // Búsqueda por nombre del producto
+      if (p.name?.toLowerCase().includes(q)) return true;
+
+      // Búsqueda por cualquier atributo dinámico (ID o valor)
+      if ((p.attribute_value_ids || []).some((valId: string) => {
+        const valueObj = catalog.values?.[valId];
+        return valueObj?.value?.toLowerCase().includes(q);
+      })) return true;
+
+      // Si no se encuentra en el nombre ni en los atributos, no hay coincidencia
+      return false;
     });
 
-    return { success: true, message: 'OK', data: results };
+    // Enriquecer resultados con nombres de atributos para el frontend
+    const enrichedResults = results.map((p: any) => {
+      const enrichedAttributes: { [key: string]: string | string[] } = {};
+      for (const fieldLabel in p.attributes) {
+        const valueIds = p.attributes[fieldLabel];
+        if (Array.isArray(valueIds)) {
+          enrichedAttributes[fieldLabel] = valueIds.map(valId => catalog.values?.[valId]?.value || valId);
+        } else {
+          enrichedAttributes[fieldLabel] = catalog.values?.[valueIds]?.value || valueIds;
+        }
+      }
+      // Resolver el nombre de la categoría también
+      const categoryName = catalog.values?.[p.category_id]?.value || p.category_id;
+
+      return { ...p, category_name: categoryName, enrichedAttributes };
+    });
+
+    return { success: true, message: 'OK', data: enrichedResults };
   }
 }
 
