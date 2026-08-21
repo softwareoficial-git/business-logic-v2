@@ -117,6 +117,7 @@ class Dispatcher {
             SISTEMA_ADMIN: 3,
             DUEÑO: 2,
             EMPLEADO: 1,
+            PARTNER: 1,
             GUEST: 0,
         };
         return (hierarchy[userRole] || 0) >= (hierarchy[requiredRole] || 0);

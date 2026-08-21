@@ -10,7 +10,16 @@ const Dispatcher_1 = require("./core/Dispatcher");
 const InfraClient_1 = require("./core/InfraClient");
 const ErrorHandler_1 = require("./core/ErrorHandler");
 const CsrfMiddleware_1 = require("./core/CsrfMiddleware");
+const PartnerAuthMiddleware_1 = require("./core/PartnerAuthMiddleware");
 const billing_1 = require("./modules/billing");
+const schema_1 = require("./modules/schema");
+const product_1 = require("./modules/product");
+const web_1 = require("./modules/web");
+// Forzar inicialización de módulos
+billing_1.billingModule;
+schema_1.schemaModule;
+product_1.productModule;
+web_1.webModule;
 // ... (después de importaciones)
 const child_process_1 = require("child_process");
 const util_1 = __importDefault(require("util"));
@@ -20,7 +29,13 @@ const app = (0, express_1.default)();
 app.use((0, cors_1.default)({ origin: true, credentials: true }));
 app.use((0, cookie_parser_1.default)());
 app.use(express_1.default.json());
-app.use(CsrfMiddleware_1.csrfMiddleware);
+// Middleware CSRF condicional: excluir rutas de API
+app.use((req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+        return next();
+    }
+    (0, CsrfMiddleware_1.csrfMiddleware)(req, res, next);
+});
 // Webhook Dinámico por Tenant
 app.post('/api/billing/webhook/:tenantId', async (req, res) => {
     const { tenantId } = req.params;
@@ -56,6 +71,7 @@ app.post('/api/billing/create-payment', async (req, res) => {
 // ... (resto de app.ts)
 // Middleware para construir el RequestContext desde las cookies/headers
 const contextMiddleware = async (req, res, next) => {
+    console.log('[DEBUG] Cookies recibidas:', req.cookies);
     const token = req.cookies.session_token || req.headers.authorization?.toString().replace('Bearer ', '');
     const { cmd } = req.body;
     // Permitir login y track-visit sin token
@@ -169,9 +185,8 @@ app.post('/execute', contextMiddleware, async (req, res) => {
         if (cmd === 'USER:login' && result.data?.token) {
             res.cookie('session_token', result.data.token, {
                 httpOnly: true,
-                secure: true,
-                sameSite: 'none',
-                partitioned: true,
+                secure: false, // Cambiado para desarrollo local
+                sameSite: 'lax', // Cambiado para desarrollo local
                 maxAge: 24 * 60 * 60 * 1000 // 24 hours
             });
             // Include token in user object for cross-origin compatibility, instead of removing it
@@ -186,6 +201,26 @@ app.post('/execute', contextMiddleware, async (req, res) => {
             res.clearCookie('session_token');
         }
         // --------------------------------
+        res.json(result);
+    }
+    catch (error) {
+        const appError = ErrorHandler_1.ErrorHandler.handle(error);
+        res.status(appError.statusCode).json(ErrorHandler_1.ErrorHandler.formatForFrontend(appError));
+    }
+});
+// Nueva ruta para partners externos
+app.post('/api/partner/execute', PartnerAuthMiddleware_1.partnerAuth, async (req, res) => {
+    const { cmd, params } = req.body;
+    const context = req.context;
+    if (!context.permissions || !context.permissions.includes(cmd)) {
+        return res.status(403).json({ success: false, message: 'Permiso denegado para este comando' });
+    }
+    try {
+        const result = await Dispatcher_1.dispatcher.execute(cmd, params || {}, context);
+        if (!result.success) {
+            const appError = ErrorHandler_1.ErrorHandler.handle(result);
+            return res.status(appError.statusCode).json(ErrorHandler_1.ErrorHandler.formatForFrontend(appError));
+        }
         res.json(result);
     }
     catch (error) {
