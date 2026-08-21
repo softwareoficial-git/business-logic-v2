@@ -29,6 +29,23 @@ export class PublicStoreController {
     }
   }
 
+  // Endpoint para verificar la disponibilidad de un nombre de tienda (slug)
+  static async checkStoreNameAvailability(req: Request, res: Response) {
+    try {
+      const { storeNameSlug } = req.params;
+      const tenantId = await TenantService.getTenantIdByName(storeNameSlug);
+      
+      res.json({
+        success: true,
+        isAvailable: tenantId === null, // Si no encuentra un ID, está disponible
+        message: tenantId === null ? 'Nombre de tienda disponible' : 'Nombre de tienda ya en uso'
+      });
+    } catch (error: any) {
+      console.error('Error checking store name availability:', error);
+      res.status(500).json({ success: false, isAvailable: false, message: 'Error interno del servidor' });
+    }
+  }
+
   // Mantenemos la ruta original por si se necesita
   static async getProducts(req: Request, res: Response) {
     try {
