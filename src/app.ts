@@ -146,6 +146,15 @@ const contextMiddleware = async (req: Request, res: Response, next: NextFunction
 
 app.get('/health', (req, res) => res.json({ status: 'online', version: '2.0.0' }));
 
+// DIAGNÓSTICO TEMPORAL: Verificar configuración Cloudinary
+app.get('/debug-env', (req, res) => {
+  res.json({
+    hasCloudName: !!process.env.CLOUDINARY_CLOUD_NAME,
+    hasApiKey: !!process.env.CLOUDINARY_API_KEY,
+    hasApiSecret: !!process.env.CLOUDINARY_API_SECRET
+  });
+});
+
 app.post('/register', async (req: Request, res: Response) => {
   const { username, password, nombreCliente } = req.body;
 
