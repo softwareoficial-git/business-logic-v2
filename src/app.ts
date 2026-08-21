@@ -12,6 +12,13 @@ import { logger } from './core/Logger'; // Assuming Logger is moved to V2 or we 
 import { billingModule } from './modules/billing';
 import { schemaModule } from './modules/schema';
 import { productModule } from './modules/product';
+import { webModule } from './modules/web';
+
+// Forzar inicialización de módulos
+billingModule;
+schemaModule;
+productModule;
+webModule;
 
 // ... (después de importaciones)
 import { exec } from 'child_process';
