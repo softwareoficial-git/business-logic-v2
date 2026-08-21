@@ -178,7 +178,11 @@ class StockModule {
   private async listStock(context: RequestContext): Promise<ServiceResponse> {
     const engine = new DataEngine(context.tenantId, context.token);
     const stock = await engine.getNamespace('stock');
-    return { success: true, message: 'OK', data: Object.values(stock) };
+    
+    // Filtrar objetos fantasma que no tengan un 'code' válido
+    const validProducts = Object.values(stock).filter((item: any) => item && item.code);
+    
+    return { success: true, message: 'OK', data: validProducts };
   }
 }
 
