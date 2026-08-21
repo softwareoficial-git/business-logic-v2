@@ -130,6 +130,7 @@ class StockModule {
   }
 
   private async deleteProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
+    console.log('Delete params received:', params);
     const { code } = params;
     if (!code) return { success: false, message: 'code es requerido' };
 
