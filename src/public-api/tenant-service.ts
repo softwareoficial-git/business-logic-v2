@@ -17,4 +17,17 @@ export class TenantService {
       return `Tienda ${tenantId}`;
     }
   }
+
+  static async getTenantIdByName(name: string): Promise<number | null> {
+    try {
+      const res = await this.dbPool.query(
+        'SELECT id FROM public.clientes WHERE nombre = $1',
+        [name]
+      );
+      return res.rows.length > 0 ? res.rows[0].id : null;
+    } catch (error) {
+      console.error('Error resolving tenant ID by name:', error);
+      return null;
+    }
+  }
 }
