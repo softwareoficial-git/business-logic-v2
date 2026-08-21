@@ -80,6 +80,39 @@ class ProductModule {
     return { success: true, message: 'Producto creado exitosamente' };
   }
 
+  private async getProduct(context: RequestContext, params: any): Promise<ServiceResponse> {
+    const { productCode } = params;
+    if (!productCode) return { success: false, message: 'productCode es requerido' };
+
+    const engine = new DataEngine(context.tenantId, context.token);
+    const product = await engine.getProductFullData(productCode); // Llama al método directamente
+
+    if (!product) {
+      return { success: false, message: 'Producto no encontrado' };
+    }
+
+    // Opcional: Enriquecer el producto con los nombres de los atributos
+    const catalog = await engine.getNamespace('dynamic_catalog');
+    const enrichedAttributes: { [key: string]: string | string[] } = {};
+    if (product.attributes) {
+      for (const fieldLabel in product.attributes) {
+        const valueIds = product.attributes[fieldLabel];
+        if (Array.isArray(valueIds)) {
+          enrichedAttributes[fieldLabel] = valueIds.map(valId => catalog.values?.[valId]?.value || valId);
+        } else {
+          enrichedAttributes[fieldLabel] = catalog.values?.[valueIds]?.value || valueIds;
+        }
+      }
+    }
+    const categoryName = catalog.values?.[product.category_id]?.value || product.category_id;
+
+    return { 
+      success: true, 
+      message: 'OK', 
+      data: { ...product, category_name: categoryName, enrichedAttributes } 
+    };
+  }
+
   private async searchProducts(context: RequestContext, params: any): Promise<ServiceResponse> {
     const { query = '' } = params;
     const q = query.toLowerCase();

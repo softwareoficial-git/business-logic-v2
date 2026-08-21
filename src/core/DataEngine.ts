@@ -37,7 +37,7 @@ export class DataEngine {
     return res.rowCount !== null && res.rowCount > 0;
   }
 
-  // Métodos para Schema dinámico (restaurados)
+  // Métodos para Schema dinámico
   async createField(label: string, parentFieldId?: string): Promise<string> {
     const data = await this.getNamespace('dynamic_catalog');
     if (!data.meta) data.meta = { next_field_id: 1, next_value_id: 1 };
@@ -64,7 +64,55 @@ export class DataEngine {
     return valueId;
   }
 
-  // --- MÉTODOS DE NEGOCIO (EL CEREBRO) ---
+  async resolveFieldId(fieldLabel: string): Promise<string | undefined> {
+    const data = await this.getNamespace('dynamic_catalog');
+    const field = Object.entries(data.fields || {}).find(([id, f]: [string, any]) => f.label === fieldLabel);
+    return field ? field[0] : undefined;
+  }
+
+  async ensureValueId(fieldLabel: string, valueLabel: string, parentValueLabel?: string): Promise<string> {
+    const data = await this.getNamespace('dynamic_catalog');
+    const fieldId = await this.resolveFieldId(fieldLabel);
+
+    if (!fieldId) {
+      throw new Error(`Field with label "${fieldLabel}" not found. Please create it first.`);
+    }
+
+    let parentId: string | undefined;
+    if (parentValueLabel) {
+      const parentFieldEntry = Object.entries(data.fields || {}).find(([id, f]: [string, any]) => f.label === fieldLabel && f.parent_field_id);
+      if (parentFieldEntry) {
+        const parentFieldIdFromEntry = (parentFieldEntry[1] as any).parent_field_id;
+        const parentFieldLabel = (data.fields[parentFieldIdFromEntry] as any)?.label;
+        const resolvedParentFieldId = await this.resolveFieldId(parentFieldLabel);
+        
+        const parentValueEntry = Object.entries(data.values || {}).find(([id, v]: [string, any]) => 
+          resolvedParentFieldId && v.field_id === resolvedParentFieldId && v.value === parentValueLabel
+        );
+        if (!parentValueEntry) throw new Error(`Parent value "${parentValueLabel}" not found for field "${parentFieldLabel}".`);
+        parentId = parentValueEntry[0];
+      }
+    }
+
+    const existingValue = Object.entries(data.values || {}).find(([id, v]: [string, any]) => 
+      v.field_id === fieldId && v.value === valueLabel && (parentId ? v.parent_id === parentId : !v.parent_id)
+    );
+
+    if (existingValue) {
+      return existingValue[0];
+    }
+
+    // Create new value if not found
+    const valueId = `val_${data.meta.next_value_id}`;
+    if (!data.values) data.values = {};
+    data.values[valueId] = { field_id: fieldId, value: valueLabel, parent_id: parentId };
+    data.meta.next_value_id++;
+    
+    await this.saveNamespace('dynamic_catalog', data);
+    return valueId;
+  }
+
+  // --- PRODUCTOS Y STOCK ---
 
   async getProductFullData(productCode: string): Promise<any> {
     const [productos, stock, compat] = await Promise.all([
