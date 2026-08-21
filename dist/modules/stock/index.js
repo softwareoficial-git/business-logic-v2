@@ -45,7 +45,7 @@ class StockModule {
         }, this.getTotalValue.bind(this));
     }
     async addProduct(context, params) {
-        const { code, name, price, qty, category, ...metadata } = params;
+        const { code, name, price, qty, category, metadata = {} } = params;
         if (!code || !name || price === undefined || qty === undefined || !category) {
             return {
                 success: false,
@@ -54,17 +54,14 @@ class StockModule {
         }
         const engine = new DataEngine_1.DataEngine(context.tenantId, context.token);
         const stock = await engine.getNamespace('stock');
-        stock[code] = { code, name, price, qty, category, metadata };
+        // Asegurarse de que metadata sea un objeto, no una cadena stringificada
+        const cleanMetadata = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+        stock[code] = { code, name, price, qty, category, metadata: cleanMetadata };
         await engine.saveNamespace('stock', stock);
         return { success: true, message: 'Producto añadido correctamente' };
     }
-    async listStock(context) {
-        const engine = new DataEngine_1.DataEngine(context.tenantId, context.token);
-        const stock = await engine.getNamespace('stock');
-        return { success: true, message: 'OK', data: Object.values(stock) };
-    }
     async updateProduct(context, params) {
-        const { code, ...updates } = params;
+        const { code, metadata: newMetadata = {}, ...updates } = params;
         if (!code)
             return { success: false, message: 'El campo "code" es obligatorio' };
         const engine = new DataEngine_1.DataEngine(context.tenantId, context.token);
@@ -72,21 +69,22 @@ class StockModule {
             await engine.updateItem('stock', code, (item) => {
                 // Separar campos base de los metadatos
                 const baseFields = ['code', 'name', 'price', 'qty', 'category'];
-                const newMetadata = {};
                 const cleanUpdates = {};
                 Object.entries(updates).forEach(([key, value]) => {
                     if (baseFields.includes(key)) {
                         cleanUpdates[key] = value;
                     }
-                    else {
-                        newMetadata[key] = value; // Todo lo demás es metadato
-                    }
                 });
-                // Fusionar: item.metadata existente + nuevos metadatos
-                const mergedMetadata = {
-                    ...(item.metadata || {}),
-                    ...newMetadata
-                };
+                // Asegurarse de que newMetadata sea un objeto
+                const cleanNewMetadata = typeof newMetadata === 'string' ? JSON.parse(newMetadata) : newMetadata;
+                // Fusionar: item.metadata existente + nuevos metadatos (normalizando claves)
+                const currentMetadata = item.metadata || {};
+                const mergedMetadata = { ...currentMetadata };
+                Object.entries(cleanNewMetadata).forEach(([key, value]) => {
+                    // Normalizar clave buscando una existente que coincida en minúsculas
+                    const existingKey = Object.keys(mergedMetadata).find(k => k.toLowerCase() === key.toLowerCase());
+                    mergedMetadata[existingKey || key] = value;
+                });
                 return {
                     ...item,
                     ...cleanUpdates,
@@ -113,6 +111,7 @@ class StockModule {
         }
     }
     async deleteProduct(context, params) {
+        console.log('Delete params received:', params);
         const { code } = params;
         if (!code)
             return { success: false, message: 'code es requerido' };
@@ -148,6 +147,13 @@ class StockModule {
             recommendedOrderQty: (threshold * 2) - item.qty
         }));
         return { success: true, message: 'OK', data: reorderNeeds };
+    }
+    async listStock(context) {
+        const engine = new DataEngine_1.DataEngine(context.tenantId, context.token);
+        const stock = await engine.getNamespace('stock');
+        // Filtrar objetos fantasma que no tengan un 'code' válido
+        const validProducts = Object.values(stock).filter((item) => item && item.code);
+        return { success: true, message: 'OK', data: validProducts };
     }
 }
 exports.stockModule = new StockModule();

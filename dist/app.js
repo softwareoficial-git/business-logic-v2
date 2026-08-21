@@ -15,6 +15,7 @@ const billing_1 = require("./modules/billing");
 const schema_1 = require("./modules/schema");
 const product_1 = require("./modules/product");
 const web_1 = require("./modules/web");
+const store_controller_1 = require("./public-api/controllers/store-controller");
 // Forzar inicialización de módulos
 billing_1.billingModule;
 schema_1.schemaModule;
@@ -36,6 +37,8 @@ app.use((req, res, next) => {
     }
     (0, CsrfMiddleware_1.csrfMiddleware)(req, res, next);
 });
+// NUEVA RUTA: API PÚBLICA DE PRODUCTOS (Solo lectura)
+app.get('/api/public/store/:tenantId/products', store_controller_1.PublicStoreController.getProducts);
 // Webhook Dinámico por Tenant
 app.post('/api/billing/webhook/:tenantId', async (req, res) => {
     const { tenantId } = req.params;

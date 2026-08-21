@@ -13,6 +13,7 @@ import { billingModule } from './modules/billing';
 import { schemaModule } from './modules/schema';
 import { productModule } from './modules/product';
 import { webModule } from './modules/web';
+import { PublicStoreController } from './public-api/controllers/store-controller';
 
 // Forzar inicialización de módulos
 billingModule;
@@ -38,6 +39,9 @@ app.use((req, res, next) => {
   }
   csrfMiddleware(req, res, next);
 });
+
+// NUEVA RUTA: API PÚBLICA DE PRODUCTOS (Solo lectura)
+app.get('/api/public/store/:tenantId/products', PublicStoreController.getProducts);
 
 // Webhook Dinámico por Tenant
 app.post('/api/billing/webhook/:tenantId', async (req: Request, res: Response) => {
