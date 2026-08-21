@@ -10,6 +10,8 @@ import { csrfMiddleware } from './core/CsrfMiddleware';
 import { partnerAuth } from './core/PartnerAuthMiddleware';
 import { logger } from './core/Logger'; // Assuming Logger is moved to V2 or we use a simple console
 import { billingModule } from './modules/billing';
+import { schemaModule } from './modules/schema';
+import { productModule } from './modules/product';
 
 // ... (después de importaciones)
 import { exec } from 'child_process';
