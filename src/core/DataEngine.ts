@@ -1,9 +1,8 @@
 import { Pool } from 'pg';
 
 /**
- * DataEngine: Motor de gestión de datos multi-namespace.
- * Centraliza el acceso a las hojas de datos (jsonb) en cliente_data_sheets.
- * Ahora con soporte para IDs dinámicos y relaciones padre-hijo.
+ * DataEngine: Motor de gestión de datos multi-tenant estricto.
+ * Garantiza aislamiento total entre clientes.
  */
 export class DataEngine {
   private tenantId: number;
@@ -18,6 +17,7 @@ export class DataEngine {
     });
   }
 
+  // Aislamiento estricto: todas las consultas se filtran por el tenantId del usuario
   async getNamespace(namespace: string): Promise<any> {
     const res = await this.dbPool.query(
       'SELECT data FROM public.cliente_data_sheets WHERE cliente_id = $1 AND namespace = $2',
@@ -37,36 +37,8 @@ export class DataEngine {
     return res.rowCount !== null && res.rowCount > 0;
   }
 
-  async createField(label: string, parentFieldId?: string): Promise<string> {
-    const data = await this.getNamespace('dynamic_catalog');
-    if (!data.meta) data.meta = { next_field_id: 1, next_value_id: 1 };
-    
-    const fieldId = `field_${data.meta.next_field_id}`;
-    if (!data.fields) data.fields = {};
-    data.fields[fieldId] = { label, is_relational: true, parent_field_id: parentFieldId };
-    data.meta.next_field_id++;
-    
-    await this.saveNamespace('dynamic_catalog', data);
-    return fieldId;
-  }
+  // --- MÉTODOS DE NEGOCIO (EL CEREBRO) ---
 
-  async createValue(fieldId: string, value: string, parentId?: string): Promise<string> {
-    const data = await this.getNamespace('dynamic_catalog');
-    if (!data.meta) data.meta = { next_field_id: 1, next_value_id: 1 };
-    
-    const valueId = `val_${data.meta.next_value_id}`;
-    if (!data.values) data.values = {};
-    data.values[valueId] = { field_id: fieldId, value, parent_id: parentId };
-    data.meta.next_value_id++;
-    
-    await this.saveNamespace('dynamic_catalog', data);
-    return valueId;
-  }
-
-  /**
-   * Resolver: Obtiene un producto con sus datos de stock y compatibilidad unidos.
-   * Emula un "JOIN" de base de datos relacional sobre los namespaces.
-   */
   async getProductFullData(productCode: string): Promise<any> {
     const [productos, stock, compat] = await Promise.all([
       this.getNamespace('productos'),
@@ -84,5 +56,19 @@ export class DataEngine {
       stock: stockItem ? (stockItem.qty || 0) : 0,
       compatibilidad: (compat.product_to_models && compat.product_to_models[productCode]) || []
     };
+  }
+
+  async updateStock(productCode: string, qtyDelta: number): Promise<boolean> {
+    return await this.updateItem('stock', productCode, (item) => {
+      return { ...item, qty: (item.qty || 0) + qtyDelta };
+    });
+  }
+
+  async updateItem(namespace: string, id: string, updateFn: (item: any) => any): Promise<boolean> {
+    const data = await this.getNamespace(namespace);
+    if (!data[id]) throw new Error(`Item ${id} not found in ${namespace}`);
+    
+    data[id] = updateFn(data[id]);
+    return await this.saveNamespace(namespace, data);
   }
 }
