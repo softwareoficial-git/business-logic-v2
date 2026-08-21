@@ -59,7 +59,7 @@ class ProductModule {
     const productos = await engine.getNamespace('productos');
     
     const results = Object.values(productos).filter((p: any) => {
-      const searchString = `${p.name} ${p.metadata.marca} ${p.metadata.calidad} ${p.metadata.marco}`.toLowerCase();
+      const searchString = `${p.name || ''} ${p.metadata?.marca || ''} ${p.metadata?.calidad || ''} ${p.metadata?.marco || ''}`.toLowerCase();
       return query.toLowerCase().split(' ').every((q: string) => searchString.includes(q));
     });
 
