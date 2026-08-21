@@ -21,7 +21,14 @@ export class PublicProductService {
     // Convertir a lista y limpiar
     const products = Object.entries(rawData)
       .filter(([key, value]) => key !== 'meta' && !key.startsWith('ORD-') && value && typeof value === 'object')
-      .map(([key, value]) => ({ ...(value as object), id: key }));
+      .map(([key, value]) => {
+        const product = value as any;
+        return {
+          ...product,
+          id: key,
+          image_url: product.metadata?.image_url || null // Promocionar image_url a la raíz
+        };
+      });
 
     // Filtrar basado en los parámetros
     return products.filter(product => {
