@@ -39,9 +39,11 @@ export class PublicProductService {
 
         if (key.startsWith('metadata.')) {
           const metaKey = key.split('.')[1];
-          // Para metadatos, si hay múltiples valores para la misma llave, se comporta como OR
-          // pero entre diferentes llaves de metadatos se comporta como AND (gracias al .every de arriba)
-          return values.includes(product.metadata?.[metaKey]);
+          const productValue = product.metadata?.[metaKey];
+          if (!productValue) return false;
+          // Manejar si el producto tiene "lechuga, tomate" y filtramos por "lechuga"
+          const productValues = String(productValue).split(',').map(v => v.trim());
+          return values.some(v => productValues.includes(v));
         }
 
         return values.includes((product as any)[key]);
