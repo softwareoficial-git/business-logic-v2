@@ -50,25 +50,44 @@ export class PublicStoreController {
     }
   }
 
+  static async getStoreDetails(req: Request, res: Response) {
+    try {
+      const { tenantId } = req.params;
+      
+      const [config, tenantName] = await Promise.all([
+        TenantService.getTenantConfig(tenantId),
+        TenantService.getTenantName(tenantId)
+      ]);
+      
+      if (!config) {
+        return res.status(404).json({ success: false, message: 'Configuración no encontrada' });
+      }
+
+      res.json({
+        success: true,
+        tenantName,
+        settings: config.settings,
+        store_info: config.settings?.store_info
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   static async getProducts(req: Request, res: Response) {
     try {
       const { tenantId } = req.params;
       const filters = req.query;
       
-      const systemToken = process.env.SYSTEM_TOKEN || 'BOOTSTRAP_TOKEN';
-      const engine = new DataEngine(parseInt(tenantId), systemToken);
-      
-      const [products, tenantName, settings] = await Promise.all([
+      const [products, tenantName] = await Promise.all([
         PublicProductService.getProducts(tenantId, filters),
-        TenantService.getTenantName(tenantId),
-        engine.getNamespace('settings')
+        TenantService.getTenantName(tenantId)
       ]);
       
       res.json({
         success: true,
         tenantName,
         count: products.length,
-        settings,
         data: products
       });
     } catch (error: any) {

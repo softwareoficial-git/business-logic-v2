@@ -45,22 +45,39 @@ class PublicStoreController {
             res.status(500).json({ success: false, isAvailable: false, message: 'Error interno del servidor' });
         }
     }
+    static async getStoreDetails(req, res) {
+        try {
+            const { tenantId } = req.params;
+            const [config, tenantName] = await Promise.all([
+                tenant_service_1.TenantService.getTenantConfig(tenantId),
+                tenant_service_1.TenantService.getTenantName(tenantId)
+            ]);
+            if (!config) {
+                return res.status(404).json({ success: false, message: 'Configuración no encontrada' });
+            }
+            res.json({
+                success: true,
+                tenantName,
+                settings: config.settings,
+                store_info: config.settings?.store_info
+            });
+        }
+        catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    }
     static async getProducts(req, res) {
         try {
             const { tenantId } = req.params;
             const filters = req.query;
-            const systemToken = process.env.SYSTEM_TOKEN || 'BOOTSTRAP_TOKEN';
-            const engine = new DataEngine_1.DataEngine(parseInt(tenantId), systemToken);
-            const [products, tenantName, settings] = await Promise.all([
+            const [products, tenantName] = await Promise.all([
                 product_service_1.PublicProductService.getProducts(tenantId, filters),
-                tenant_service_1.TenantService.getTenantName(tenantId),
-                engine.getNamespace('settings')
+                tenant_service_1.TenantService.getTenantName(tenantId)
             ]);
             res.json({
                 success: true,
                 tenantName,
                 count: products.length,
-                settings,
                 data: products
             });
         }

@@ -3,6 +3,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TenantService = void 0;
 const pg_1 = require("pg");
 class TenantService {
+    static async getTenantConfig(tenantId) {
+        try {
+            const res = await this.dbPool.query('SELECT public_config FROM public.clientes WHERE id = $1', [parseInt(tenantId)]);
+            return res.rows.length > 0 ? res.rows[0].public_config : null;
+        }
+        catch (error) {
+            console.error('Error fetching tenant config:', error);
+            return null;
+        }
+    }
     static async getTenantName(tenantId) {
         try {
             const res = await this.dbPool.query('SELECT nombre FROM public.clientes WHERE id = $1', [parseInt(tenantId)]);
