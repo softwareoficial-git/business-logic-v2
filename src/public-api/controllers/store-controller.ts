@@ -61,7 +61,7 @@ export class PublicStoreController {
       
       // Reutilizamos la lógica de getStoreDetails pasando el ID resuelto
       req.params.tenantId = tenantId.toString();
-      return this.getStoreDetails(req, res);
+      return PublicStoreController.getStoreDetails(req, res);
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
