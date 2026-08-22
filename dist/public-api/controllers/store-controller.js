@@ -45,6 +45,21 @@ class PublicStoreController {
             res.status(500).json({ success: false, isAvailable: false, message: 'Error interno del servidor' });
         }
     }
+    static async getStoreDetailsByName(req, res) {
+        try {
+            const { tenantName } = req.params;
+            const tenantId = await tenant_service_1.TenantService.getTenantIdByName(tenantName);
+            if (!tenantId) {
+                return res.status(404).json({ success: false, message: 'Tienda no encontrada' });
+            }
+            // Reutilizamos la lógica de getStoreDetails pasando el ID resuelto
+            req.params.tenantId = tenantId.toString();
+            return PublicStoreController.getStoreDetails(req, res);
+        }
+        catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    }
     static async getStoreDetails(req, res) {
         try {
             const { tenantId } = req.params;

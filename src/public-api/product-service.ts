@@ -26,18 +26,24 @@ export class PublicProductService {
         return {
           ...product,
           id: key,
-          image_url: product.metadata?.image_url || null // Promocionar image_url a la raíz
+          image_url: product.metadata?.image_url || null
         };
       });
 
     // Filtrar basado en los parámetros
     return products.filter(product => {
       return Object.entries(filters).every(([key, value]) => {
-        // Soporte para metadatos anidados: ej. "metadata.model"
-        if (key.includes('.')) {
-          const [base, metaKey] = key.split('.');
-          return (product as any)[base]?.[metaKey] == value;
+        // Filtrado de categoría jerárquico
+        if (key === 'category') {
+          return (product.category === value) || (product.category?.startsWith(`${value}/`));
         }
+
+        // Soporte para metadatos anidados: ej. "metadata.model"
+        if (key.startsWith('metadata.')) {
+          const metaKey = key.split('.')[1];
+          return product.metadata?.[metaKey] == value;
+        }
+
         return (product as any)[key] == value;
       });
     });
