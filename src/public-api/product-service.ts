@@ -11,14 +11,12 @@ export class PublicProductService {
     return systemToken;
   }
 
-  static async getProducts(tenantId: string, filters: Record<string, any> = {}) {
+  static async getProducts(tenantId: string, filters: Record<string, any | any[]> = {}) {
     const token = await this.getEngine();
     const engine = new DataEngine(parseInt(tenantId), token);
     
-    // Obtener los datos crudos del namespace 'stock'
     const rawData = await engine.getNamespace('stock');
     
-    // Convertir a lista y limpiar
     const products = Object.entries(rawData)
       .filter(([key, value]) => key !== 'meta' && !key.startsWith('ORD-') && value && typeof value === 'object')
       .map(([key, value]) => {
@@ -30,21 +28,23 @@ export class PublicProductService {
         };
       });
 
-    // Filtrar basado en los parámetros
     return products.filter(product => {
-      return Object.entries(filters).every(([key, value]) => {
-        // Filtrado de categoría jerárquico
+      return Object.entries(filters).every(([key, filterValue]) => {
+        const values = Array.isArray(filterValue) ? filterValue : [filterValue];
+
         if (key === 'category') {
-          return (product.category === value) || (product.category?.startsWith(`${value}/`));
+          // Si hay múltiples categorías, el producto debe cumplir al menos una (o ser jerárquica)
+          return values.some(val => (product.category === val) || (product.category?.startsWith(`${val}/`)));
         }
 
-        // Soporte para metadatos anidados: ej. "metadata.model"
         if (key.startsWith('metadata.')) {
           const metaKey = key.split('.')[1];
-          return product.metadata?.[metaKey] == value;
+          // Para metadatos, si hay múltiples valores para la misma llave, se comporta como OR
+          // pero entre diferentes llaves de metadatos se comporta como AND (gracias al .every de arriba)
+          return values.includes(product.metadata?.[metaKey]);
         }
 
-        return (product as any)[key] == value;
+        return values.includes((product as any)[key]);
       });
     });
   }
