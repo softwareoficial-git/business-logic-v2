@@ -32,6 +32,9 @@ class SalesModule {
     const engine = new DataEngine(context.tenantId, context.token);
     const stock = await engine.getNamespace('stock');
     const productos = await engine.getNamespace('productos');
+    
+    console.log('DEBUG: Keys in productos namespace:', Object.keys(productos));
+    console.log('DEBUG: Items received:', JSON.stringify(items));
 
     const soldItems = [];
     let totalSale = 0;
@@ -40,13 +43,22 @@ class SalesModule {
     for (const item of items) {
       const product = stock[item.code];
       const productMeta = productos[item.code];
+      
+      // LOG RAW: Inspección total de lo que recibe el backend
+      console.log(`DEBUG: RAW ITEM PAYLOAD: ${JSON.stringify(item)}`);
+      console.log(`DEBUG: PRODUCT METADATA FOUND: ${JSON.stringify(productMeta)}`);
+      
       if (!product) return { success: false, message: `Producto ${item.code} no encontrado` };
       if (product.qty < item.qty) return { success: false, message: `Stock insuficiente para ${productMeta?.name || item.code}` };
 
       let lineTotal = product.price * item.qty;
+      
+      // Sin fallback string duro, queremos ver qué viene o qué falta
+      const finalName = item.name || productMeta?.name || `PRODUCTO_RAW_MISSING_${item.code}`;
+
       soldItems.push({ 
         product_code: item.code, 
-        name: item.name || productMeta?.name || 'Producto Desconocido',
+        name: finalName,
         qty: item.qty, 
         price: product.price, 
         subtotal: lineTotal 
