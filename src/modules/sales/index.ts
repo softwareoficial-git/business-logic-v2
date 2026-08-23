@@ -44,7 +44,13 @@ class SalesModule {
       if (product.qty < item.qty) return { success: false, message: `Stock insuficiente para ${productMeta?.name || item.code}` };
 
       let lineTotal = product.price * item.qty;
-      soldItems.push({ product_code: item.code, name: productMeta?.name, qty: item.qty, price: product.price, subtotal: lineTotal });
+      soldItems.push({ 
+        product_code: item.code, 
+        name: productMeta?.name || 'Producto Desconocido', // Asegurar el guardado del nombre
+        qty: item.qty, 
+        price: product.price, 
+        subtotal: lineTotal 
+      });
       totalSale += lineTotal;
     }
 
