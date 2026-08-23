@@ -62,7 +62,7 @@ class SalesModule {
     // 3. Registrar venta
     const sales = await engine.getNamespace('sales');
     const saleId = `ORD-${Date.now()}`;
-    sales[saleId] = {
+    const newSale = {
       id: saleId,
       total: totalSale,
       items: soldItems,
@@ -70,6 +70,8 @@ class SalesModule {
       empleado: context.userId,
       createdAt: clientTimestamp || new Date().toISOString()
     };
+    console.log('DEBUG: Guardando nueva venta:', JSON.stringify(newSale));
+    sales[saleId] = newSale;
     await engine.saveNamespace('sales', sales);
 
     return { success: true, message: 'Venta procesada.', data: { sale_id: saleId, total: totalSale } };
@@ -78,6 +80,8 @@ class SalesModule {
   private async getHistory(context: RequestContext): Promise<ServiceResponse> {
     const engine = new DataEngine(context.tenantId, context.token);
     const sales = await engine.getNamespace('sales');
+    
+    console.log('DEBUG: Historial recuperado:', JSON.stringify(sales));
     
     let salesArray: any[] = [];
     
