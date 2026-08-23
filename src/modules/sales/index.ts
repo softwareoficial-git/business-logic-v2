@@ -46,7 +46,7 @@ class SalesModule {
       let lineTotal = product.price * item.qty;
       soldItems.push({ 
         product_code: item.code, 
-        name: productMeta?.name || 'Producto Desconocido', // Asegurar el guardado del nombre
+        name: item.name || productMeta?.name || 'Producto Desconocido',
         qty: item.qty, 
         price: product.price, 
         subtotal: lineTotal 
@@ -70,7 +70,7 @@ class SalesModule {
       empleado: context.userId,
       createdAt: clientTimestamp || new Date().toISOString()
     };
-    console.log('DEBUG: Guardando nueva venta:', JSON.stringify(newSale));
+    console.log('DEBUG: Estructura de items a guardar:', JSON.stringify(soldItems, null, 2));
     sales[saleId] = newSale;
     await engine.saveNamespace('sales', sales);
 
@@ -81,7 +81,11 @@ class SalesModule {
     const engine = new DataEngine(context.tenantId, context.token);
     const sales = await engine.getNamespace('sales');
     
-    console.log('DEBUG: Historial recuperado:', JSON.stringify(sales));
+    // Loguear una venta cualquiera del historial para ver su estructura
+    const saleIds = Object.keys(sales);
+    if (saleIds.length > 0) {
+      console.log('DEBUG: Ejemplo de venta recuperada:', JSON.stringify(sales[saleIds[0]], null, 2));
+    }
     
     let salesArray: any[] = [];
     
