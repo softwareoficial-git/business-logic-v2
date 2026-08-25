@@ -1,6 +1,7 @@
 import { dispatcher } from '../core/Dispatcher';
 import { infraClient, ServiceResponse } from '../core/InfraClient';
 import { RequestContext } from '../core/RequestContext';
+import { TenantService } from '../public-api/tenant-service';
 
 function isObject(item: any): boolean {
   return (item && typeof item === 'object' && !Array.isArray(item));
@@ -41,11 +42,16 @@ class SettingsModule {
   }
 
   private async getSettings(context: RequestContext, params: any): Promise<ServiceResponse> {
-    const res = await infraClient.readPath<Record<string, any>>(context.tenantId, 'settings', context.token);
+    const [res, tenantName] = await Promise.all([
+        infraClient.readPath<Record<string, any>>(context.tenantId, 'settings', context.token),
+        TenantService.getTenantName(context.tenantId.toString())
+    ]);
+    
+    const settings = res.success && res.data ? res.data : {};
     return { 
         success: true, 
         message: 'OK', 
-        data: res.success && res.data ? res.data : {} 
+        data: { ...settings, tenantName }
     };
   }
 
