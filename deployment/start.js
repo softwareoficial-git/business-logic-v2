@@ -44,14 +44,16 @@ async function startSystem() {
   // Proceso de limpieza de nodos eliminado por solicitud del usuario
 
   // 2. Postgres
-  console.log('🐳 Iniciando Postgres...');
-  execSync('docker stop pg-db || true && docker rm pg-db || true', { stdio: 'ignore' });
-  execSync(`docker run -d --name pg-db -p 5432:5432 -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=password -e POSTGRES_DB=engine_db postgres:16-alpine`, { stdio: 'ignore' });
-  
-  console.log('⏳ Esperando Postgres...');
-  for(let i=0; i<15; i++) {
-    try { execSync(`docker exec pg-db pg_isready -U postgres -d engine_db`, { stdio: 'ignore' }); break; }
-    catch(e) { if(i===14) process.exit(1); await new Promise(r => setTimeout(r, 2000)); }
+  console.log('🐳 Verificando Postgres...');
+  try {
+    execSync(`docker exec local-postgres pg_isready -U postgres -d engine_db`, { stdio: 'ignore' });
+    console.log('✅ Postgres ya está listo.');
+  } catch(e) {
+    console.log('⏳ Esperando Postgres...');
+    for(let i=0; i<15; i++) {
+      try { execSync(`docker exec local-postgres pg_isready -U postgres -d engine_db`, { stdio: 'ignore' }); break; }
+      catch(err) { if(i===14) process.exit(1); await new Promise(r => setTimeout(r, 2000)); }
+    }
   }
 
   // 3. Arrancar servicios
